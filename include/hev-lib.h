@@ -10,13 +10,14 @@
 #ifndef __HEV_LIB_H__
 #define __HEV_LIB_H__
 
+#include <hev-memory-allocator.h>
+#include <hev-slist.h>
+#include <hev-list.h>
+#include <hev-queue.h>
 #include <hev-async-queue.h>
 #include <hev-event-loop.h>
 #include <hev-event-source.h>
-#include <hev-list.h>
-#include <hev-memory-allocator.h>
-#include <hev-queue.h>
-#include <hev-slist.h>
+#include <hev-event-source-idle.h>
 
 #endif /* __HEV_LIB_H__ */
 
