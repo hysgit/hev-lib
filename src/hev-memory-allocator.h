@@ -18,6 +18,8 @@
 #define HEV_MEMORY_ALLOCATOR_FREE(ptr) \
 	hev_memory_allocator_free (HEV_MEMORY_ALLOCATOR_DEFAULT, ptr)
 
+typedef void (*HevDestroyNotify) (void *data);
+
 typedef struct _HevMemoryAllocator HevMemoryAllocator;
 
 struct _HevMemoryAllocator
