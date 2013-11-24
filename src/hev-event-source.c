@@ -10,7 +10,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "hev-event-loop.h"
 #include "hev-event-source.h"
 
 static bool hev_event_source_prepare_default (HevEventSource *source);

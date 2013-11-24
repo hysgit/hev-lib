@@ -7,6 +7,8 @@
  ============================================================================
  */
 
+#include "hev-event-loop.h"
+
 #ifndef __HEV_EVENT_SOURCE_H__
 #define __HEV_EVENT_SOURCE_H__
 
