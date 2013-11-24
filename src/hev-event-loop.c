@@ -112,9 +112,8 @@ hev_event_loop_run (HevEventLoop *self)
 		int i = 0, nfds = 0;
 		HevSList *handle_fd = NULL;
 
-		/* poll */
-		nfds = epoll_wait (self->epoll_fd,
-					events, 256, timeout);
+		/* waiting events */
+		nfds = epoll_wait (self->epoll_fd, events, 256, timeout);
 		/* insert to fd_list, sorted by source priority */
 		for (i=0; i<nfds; i++) {
 			HevSList *list = NULL;
@@ -157,13 +156,8 @@ hev_event_loop_run (HevEventLoop *self)
 			timeout = -1;
 		}
 	}
-
-	if (fd_list) {
-		HevSList *list = NULL;
-		for (list=fd_list; list; list=hev_slist_next (list))
-		  HEV_MEMORY_ALLOCATOR_FREE (hev_slist_data (list));
-		hev_slist_free (fd_list);
-	}
+	/* free fd_list */
+	hev_slist_free (fd_list);
 }
 
 void
