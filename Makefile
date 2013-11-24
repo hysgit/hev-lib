@@ -4,7 +4,7 @@ PP=cpp
 CC=cc
 LD=ld
 AR=ar
-CCFLAGS=-g -Werror -Wall
+CCFLAGS=-O3 -Werror -Wall
 LDFLAGS=
  
 SRCDIR=src
