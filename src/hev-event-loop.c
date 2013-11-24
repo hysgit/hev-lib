@@ -101,22 +101,41 @@ hev_event_loop_unref (HevEventLoop *self)
 void
 hev_event_loop_run (HevEventLoop *self)
 {
+	HevSList *fd_list = NULL;
+	int timeout = -1;
+
 	if (!self)
 	  return;
 
 	while (self->run) {
 		struct epoll_event events[256];
 		int i = 0, nfds = 0;
-		HevSList *invalid_sources = NULL;
+		HevSList *handle_fd = NULL;
 
 		/* poll */
 		nfds = epoll_wait (self->epoll_fd,
-					events, 256, -1);
-		/* check & dispatch */
+					events, 256, timeout);
+		/* insert to fd_list, sorted by source priority */
 		for (i=0; i<nfds; i++) {
+			HevSList *list = NULL;
 			HevEventSourceFD *fd = events[i].data.ptr;
 			HevEventSource *source = fd->source;
-			fd->revents = events[i].events;
+			fd->revents |= events[i].events;
+			for (list=fd_list; list; list=hev_slist_next (list)) {
+				HevEventSourceFD *_fd  = hev_slist_data (list);
+				HevEventSource *_source = _fd->source;
+				if (hev_event_source_get_priority (source) <
+						hev_event_source_get_priority (_source))
+				  break;
+			}
+			fd_list = hev_slist_insert_before (fd_list, fd, list);
+		}
+		/* get highest priority source fd, check & dispatch */
+		handle_fd = hev_slist_last (fd_list);
+		if (handle_fd) {
+			HevSList *invalid_sources = NULL;
+			HevEventSourceFD *fd = hev_slist_data (handle_fd);
+			HevEventSource *source = fd->source;
 			if (source->funcs.check (source, fd)) {
 				if (source->funcs.dispatch (source, fd,
 					source->callback.callback, source->callback.data)) {
@@ -125,14 +144,25 @@ hev_event_loop_run (HevEventLoop *self)
 					invalid_sources = hev_slist_append (invalid_sources, source);
 				}
 			}
+			fd_list = hev_slist_remove (fd_list, fd);
+			/* delete invalid sources */
+			if (invalid_sources) {
+				HevSList *list = NULL;
+				for (list=invalid_sources; list; list=hev_slist_next (list))
+				  hev_event_loop_del_source (self, hev_slist_data (list));
+				hev_slist_free (invalid_sources);
+			}
+			timeout = 0;
+		} else {
+			timeout = -1;
 		}
-		/* delete invalid sources */
-		if (invalid_sources) {
-			HevSList *list = NULL;
-			for (list=invalid_sources; list; list=hev_slist_next (list))
-			  hev_event_loop_del_source (self, hev_slist_data (list));
-			hev_slist_free (invalid_sources);
-		}
+	}
+
+	if (fd_list) {
+		HevSList *list = NULL;
+		for (list=fd_list; list; list=hev_slist_next (list))
+		  HEV_MEMORY_ALLOCATOR_FREE (hev_slist_data (list));
+		hev_slist_free (fd_list);
 	}
 }
 
