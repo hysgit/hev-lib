@@ -89,6 +89,39 @@ hev_slist_insert (HevSList *self, void *data, unsigned int position)
 }
 
 HevSList *
+hev_slist_insert_before (HevSList *self, void *data, HevSList *sibling)
+{
+	HevSList *new = HEV_MEMORY_ALLOCATOR_ALLOC (sizeof (HevSList));
+	if (new) {
+		new->data = data;
+		if (self) {
+			HevSList *node = NULL, *prev = NULL, *last = NULL;
+			for (node=self; node; prev=node,node=node->next) {
+				if (node == sibling)
+				  break;
+				last = node;
+			}
+			if (node) {
+				new->next = node;
+				if (prev)
+				  prev->next = new;
+				else
+				  self = new;
+			} else {
+				new->next = NULL;
+				last->next = new;
+			}
+			return self;
+		} else {
+			new->next = NULL;
+			return new;
+		}
+	}
+
+	return NULL;
+}
+
+HevSList *
 hev_slist_remove (HevSList *self, const void *data)
 {
 	if (self) {

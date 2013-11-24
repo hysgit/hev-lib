@@ -15,6 +15,7 @@ typedef struct _HevSList HevSList;
 HevSList * hev_slist_append (HevSList *self, void *data);
 HevSList * hev_slist_prepend (HevSList *self, void *data);
 HevSList * hev_slist_insert (HevSList *self, void *data, unsigned int position);
+HevSList * hev_slist_insert_before (HevSList *self, void *data, HevSList *sibling);
 HevSList * hev_slist_remove (HevSList *self, const void *data);
 HevSList * hev_slist_remove_all (HevSList *self, const void *data);
 
