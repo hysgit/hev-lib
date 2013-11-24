@@ -22,13 +22,14 @@ static void hev_event_source_finalize_default (HevEventSource *self);
 HevEventSource *
 hev_event_source_new (HevEventSourceFuncs *funcs, size_t struct_size)
 {
-	if (funcs && (sizeof (HevEventSource) <= struct_size)) {
+	if (sizeof (HevEventSource) <= struct_size) {
 		HevEventSource *self = (HevEventSource *) HEV_MEMORY_ALLOCATOR_ALLOC (struct_size);
 		if (self) {
 			self->name = NULL;
 			self->priority = 0;
 			self->ref_count = 1;
-			memcpy (&self->funcs, funcs, sizeof (HevEventSourceFuncs));
+			if (funcs)
+			  memcpy (&self->funcs, funcs, sizeof (HevEventSourceFuncs));
 			if (!self->funcs.prepare)
 			  self->funcs.prepare = hev_event_source_prepare_default;
 			if (!self->funcs.check)
