@@ -15,6 +15,7 @@ typedef struct _HevList HevList;
 HevList * hev_list_append (HevList *self, void *data);
 HevList * hev_list_prepend (HevList *self, void *data);
 HevList * hev_list_insert (HevList *self, void *data, unsigned int position);
+HevList * hev_list_insert_before (HevList *self, void *data, HevList *sibling);
 HevList * hev_list_remove (HevList *self, const void *data);
 HevList * hev_list_remove_all (HevList *self, const void *data);
 
