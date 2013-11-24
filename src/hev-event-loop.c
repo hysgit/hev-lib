@@ -10,7 +10,6 @@
 #include <stddef.h>
 #include <unistd.h>
 #include <sys/epoll.h>
-#include <sys/eventfd.h>
 
 #include "hev-slist.h"
 #include "hev-event-loop.h"
@@ -21,29 +20,7 @@ struct _HevEventLoop
 	unsigned int ref_count;
 
 	bool run;
-	HevEventSource *source_quit;
 	HevSList *sources;
-};
-
-typedef struct _HevEventSourceQuit HevEventSourceQuit;
-
-struct _HevEventSourceQuit
-{
-	HevEventSource parent;
-	int event_fd;
-};
-
-static bool hev_event_source_quit_check (HevEventSource *source,
-			HevEventSourceFD *fd);
-static void hev_event_source_quit_finalize (HevEventSource *source);
-static bool hev_event_source_quit_handler (void *data);
-
-static HevEventSourceFuncs hev_event_source_quit_funcs =
-{
-	.prepare = NULL,
-	.check = hev_event_source_quit_check,
-	.dispatch = NULL,
-	.finalize = hev_event_source_quit_finalize,
 };
 
 HevEventLoop *
@@ -56,18 +33,6 @@ hev_event_loop_new (void)
 		self->ref_count = 1;
 		self->run = true;
 		self->sources = NULL;
-
-		/* quit event source */
-		HevEventSourceQuit *quit = NULL;
-		self->source_quit = hev_event_source_new (&hev_event_source_quit_funcs,
-					sizeof (HevEventSourceQuit));
-		quit = (HevEventSourceQuit *) self->source_quit;
-		hev_event_source_set_callback (self->source_quit, hev_event_source_quit_handler,
-					self, NULL);
-		quit->event_fd = eventfd (0, 0);
-		hev_event_source_add_fd (self->source_quit, quit->event_fd, EPOLLIN | EPOLLET | EPOLLONESHOT);
-		hev_event_loop_add_source (self, self->source_quit);
-		hev_event_source_unref (self->source_quit);
 	}
 
 	return self;
@@ -163,10 +128,8 @@ hev_event_loop_run (HevEventLoop *self)
 void
 hev_event_loop_quit (HevEventLoop *self)
 {
-	if (self) {
-		HevEventSourceQuit *quit = (HevEventSourceQuit *) self->source_quit;
-		eventfd_write (quit->event_fd, 1);
-	}
+	if (self)
+	  self->run = false;
 }
 
 bool
@@ -223,30 +186,6 @@ _hev_event_loop_del_fd (HevEventLoop *self, HevEventSourceFD *fd)
 					EPOLL_CTL_DEL, fd->fd, NULL));
 	}
 
-	return false;
-}
-
-static bool
-hev_event_source_quit_check (HevEventSource *source,
-			HevEventSourceFD *fd)
-{
-	if (EPOLLIN & fd->revents)
-	  return true;
-	return false;
-}
-
-static void
-hev_event_source_quit_finalize (HevEventSource *source)
-{
-	HevEventSourceQuit *quit = (HevEventSourceQuit *) source;
-	close (quit->event_fd);
-}
-
-static bool
-hev_event_source_quit_handler (void *data)
-{
-	HevEventLoop *loop = data;
-	loop->run = false;
 	return false;
 }
 
