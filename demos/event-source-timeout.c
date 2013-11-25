@@ -11,7 +11,7 @@
 #include <hev-lib.h>
 
 static bool
-timeout_handler (void *data)
+timeout_handler (HevEventSourceFD *fd, void *data)
 {
 	printf ("timeout\n");
 	return true;

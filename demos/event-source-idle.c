@@ -11,7 +11,7 @@
 #include <hev-lib.h>
 
 static bool
-idle_handler (void *data)
+idle_handler (HevEventSourceFD *fd, void *data)
 {
 	printf ("idle\n");
 	return true;
