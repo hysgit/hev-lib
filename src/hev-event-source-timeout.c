@@ -16,8 +16,6 @@
 
 static bool hev_event_source_timeout_prepare (HevEventSource *source);
 static bool hev_event_source_timeout_check (HevEventSource *source, HevEventSourceFD *fd);
-static bool hev_event_source_timeout_dispatch (HevEventSource *source, HevEventSourceFD *fd,
-			HevEventSourceFunc callback, void *data);
 static void hev_event_source_timeout_finalize (HevEventSource *source);
 
 struct _HevEventSourceTimeout
@@ -32,7 +30,7 @@ static HevEventSourceFuncs hev_event_source_timeout_funcs =
 {
 	.prepare = hev_event_source_timeout_prepare,
 	.check = hev_event_source_timeout_check,
-	.dispatch = hev_event_source_timeout_dispatch,
+	.dispatch = NULL,
 	.finalize = hev_event_source_timeout_finalize,
 };
 
@@ -80,13 +78,6 @@ hev_event_source_timeout_check (HevEventSource *source, HevEventSourceFD *fd)
 	}
 
 	return false;
-}
-
-static bool
-hev_event_source_timeout_dispatch (HevEventSource *source, HevEventSourceFD *fd,
-			HevEventSourceFunc callback, void *data)
-{
-	return callback (fd, data);
 }
 
 static void
