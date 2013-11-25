@@ -124,7 +124,7 @@ hev_event_source_set_callback (HevEventSource *self, HevEventSourceFunc callback
 }
 
 bool
-hev_event_source_add_fd (HevEventSource *self, int fd, uint32_t events)
+hev_event_source_add_fd (HevEventSource *self, int fd, uint32_t events, void *data)
 {
 	if (self) {
 		HevEventSourceFD *efd = HEV_MEMORY_ALLOCATOR_ALLOC (sizeof (HevEventSourceFD));
@@ -133,6 +133,7 @@ hev_event_source_add_fd (HevEventSource *self, int fd, uint32_t events)
 			efd->events = events;
 			efd->revents = 0;
 			efd->source = self;
+			efd->data = data;
 			self->fds = hev_slist_append (self->fds, efd);
 			if (self->loop)
 			  return _hev_event_loop_add_fd (self->loop, efd);

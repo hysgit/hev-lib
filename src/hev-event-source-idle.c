@@ -43,7 +43,7 @@ hev_event_source_idle_new (void)
 		HevEventSourceIdle *self = (HevEventSourceIdle *) source;
 		self->event_fd = eventfd (0, EFD_NONBLOCK);
 		hev_event_source_set_priority (source, INT32_MIN);
-		hev_event_source_add_fd (source, self->event_fd, EPOLLIN | EPOLLET);
+		hev_event_source_add_fd (source, self->event_fd, EPOLLIN | EPOLLET, NULL);
 	}
 
 	return source;

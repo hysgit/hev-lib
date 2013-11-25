@@ -31,6 +31,7 @@ struct _HevEventSourceFD
 	uint32_t revents;
 
 	HevEventSource *source;
+	void *data;
 };
 
 struct _HevEventSourceFuncs
@@ -73,7 +74,7 @@ int hev_event_source_get_priority (HevEventSource *self);
 void hev_event_source_set_callback (HevEventSource *self, HevEventSourceFunc callback,
 			void *data, HevDestroyNotify notify);
 
-bool hev_event_source_add_fd (HevEventSource *self, int fd, uint32_t events);
+bool hev_event_source_add_fd (HevEventSource *self, int fd, uint32_t events, void *data);
 bool hev_event_source_del_fd (HevEventSource *self, int fd);
 
 HevEventLoop * hev_event_source_get_loop (HevEventSource *self);

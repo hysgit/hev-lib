@@ -44,7 +44,7 @@ hev_event_source_signal_new (int signal)
 		sigaddset (&mask, signal);
 		sigprocmask(SIG_BLOCK, &mask, NULL);
 		self->signal_fd = signalfd (-1, &mask, SFD_NONBLOCK);
-		hev_event_source_add_fd (source, self->signal_fd, EPOLLIN | EPOLLET);
+		hev_event_source_add_fd (source, self->signal_fd, EPOLLIN | EPOLLET, NULL);
 	}
 
 	return source;
