@@ -75,7 +75,7 @@ static bool
 hev_event_source_idle_dispatch (HevEventSource *source, HevEventSourceFD *fd,
 			HevEventSourceFunc callback, void *data)
 {
-	return callback (data);
+	return callback (fd, data);
 }
 
 static void
