@@ -20,6 +20,7 @@
 #include <hev-event-source-idle.h>
 #include <hev-event-source-timeout.h>
 #include <hev-event-source-signal.h>
+#include <hev-event-source-fds.h>
 
 #endif /* __HEV_LIB_H__ */
 
