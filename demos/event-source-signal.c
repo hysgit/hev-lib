@@ -12,7 +12,7 @@
 #include <hev-lib.h>
 
 static bool
-signal_handler (HevEventSourceFD *fd, void *data)
+signal_handler (void *data)
 {
 	printf ("signal\n");
 
