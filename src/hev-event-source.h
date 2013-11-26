@@ -22,7 +22,7 @@
 typedef struct _HevEventSource HevEventSource;
 typedef struct _HevEventSourceFD HevEventSourceFD;
 typedef struct _HevEventSourceFuncs HevEventSourceFuncs;
-typedef bool (*HevEventSourceFunc) (HevEventSourceFD *fd, void *data);
+typedef bool (*HevEventSourceFunc) (void *data);
 
 struct _HevEventSourceFD
 {

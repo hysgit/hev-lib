@@ -201,7 +201,7 @@ hev_event_source_dispatch_default (HevEventSource *source, HevEventSourceFD *fd,
 			HevEventSourceFunc callback, void *data)
 {
 	if (callback)
-	  return callback (fd, data);
+	  return callback (data);
 	return true;
 }
 
