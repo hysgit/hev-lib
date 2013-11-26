@@ -19,6 +19,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+static HevSList *client_list = NULL;
+
 typedef struct _RingBuffer RingBuffer;
 
 struct _RingBuffer
@@ -28,6 +30,15 @@ struct _RingBuffer
 	unsigned int len;
 	bool full;
 	uint8_t *buffer;
+};
+
+typedef struct _Client Client;
+
+struct _Client
+{
+	HevEventSourceFD *fd;
+	RingBuffer *buffer;
+	bool idle;
 };
 
 RingBuffer *
@@ -148,7 +159,7 @@ set_fd_nonblock (int fd, bool nonblock)
 static bool
 client_source_handler (HevEventSourceFD *fd, void *data)
 {
-	RingBuffer *buffer = NULL;
+	Client *client = NULL;
 	struct msghdr mh;
 	struct iovec iovec[2];
 	int iovec_len = 0;
@@ -156,34 +167,37 @@ client_source_handler (HevEventSourceFD *fd, void *data)
 	ssize_t size = 0;
 
 	memset (&mh, 0, sizeof (mh));
-	buffer = hev_event_source_fd_get_data (fd);
+	client = hev_event_source_fd_get_data (fd);
 	if (EPOLLIN & fd->revents) {
-		iovec_len = ring_buffer_writing (buffer, iovec);
+		iovec_len = ring_buffer_writing (client->buffer, iovec);
 		mh.msg_iov = iovec;
 		mh.msg_iovlen = iovec_len;
 		size = recvmsg (fd->fd, &mh, 0);
 		inc_len = (0 > size) ? 0 : size;
-		ring_buffer_write_finish (buffer, inc_len);
+		ring_buffer_write_finish (client->buffer, inc_len);
 
 		if (0 == size) {
 			printf ("Client %d leave\n", fd->fd);
 			close (fd->fd);
 			hev_event_source_del_fd (fd->source, fd->fd);
-			ring_buffer_free (buffer);
+			ring_buffer_free (client->buffer);
+			client_list = hev_slist_remove (client_list, client);
+			HEV_MEMORY_ALLOCATOR_FREE (client);
 		}
 
 		fd->revents &= ~EPOLLIN;
 	}
 	if (EPOLLOUT & fd->revents) {
-		iovec_len = ring_buffer_reading (buffer, iovec);
+		iovec_len = ring_buffer_reading (client->buffer, iovec);
 		mh.msg_iov = iovec;
 		mh.msg_iovlen = iovec_len;
 		size = sendmsg (fd->fd, &mh, 0);
 		inc_len = (0 > size) ? 0 : size;
-		ring_buffer_read_finish (buffer, inc_len);
+		ring_buffer_read_finish (client->buffer, inc_len);
 
 		fd->revents &= ~EPOLLOUT;
 	}
+	client->idle = false;
 
 	return true;
 }
@@ -202,16 +216,39 @@ listener_source_handler (HevEventSourceFD *fd, void *data)
 	if (0 > client_fd) {
 		printf ("Accept failed!\n");
 	} else {
-		RingBuffer *buffer = NULL;
+		Client *client = NULL;
 		HevEventSourceFD *_fd = NULL;
 		printf ("New client %d enter from %s:%u\n",
 			client_fd, inet_ntoa (addr.sin_addr), ntohs (addr.sin_port));
-		buffer = ring_buffer_new (1024);
 		set_fd_nonblock (client_fd, true);
 		_fd = hev_event_source_add_fd (client_source, client_fd, EPOLLIN | EPOLLOUT | EPOLLET);
-		hev_event_source_fd_set_data (_fd, buffer);
+		client = HEV_MEMORY_ALLOCATOR_ALLOC (sizeof (Client));
+		client->buffer = ring_buffer_new (1024);
+		client->idle = false;
+		client->fd = _fd;
+		hev_event_source_fd_set_data (_fd, client);
+		client_list = hev_slist_append (client_list, client);
 	}
 
+	return true;
+}
+
+static bool
+timeout_handler (void *data)
+{
+	HevSList *list = NULL;
+	for (list=client_list; list; list=hev_slist_next (list)) {
+		Client *client = hev_slist_data (list);
+		if (client->idle) {
+			printf ("Remove timeout client %d\n", client->fd->fd);
+			close (client->fd->fd);
+			hev_event_source_del_fd (client->fd->source, client->fd->fd);
+			ring_buffer_free (client->buffer);
+			client_list = hev_slist_remove (client_list, client);
+			HEV_MEMORY_ALLOCATOR_FREE (client);
+		}
+		client->idle = true;
+	}
 	return true;
 }
 
@@ -267,6 +304,11 @@ main (int argc, char *argv[])
 				(HevEventSourceFunc) listener_source_handler, client_source, NULL);
 	hev_event_loop_add_source (loop, listener_source);
 	hev_event_source_unref (listener_source);
+
+	source = hev_event_source_timeout_new (60* 1000);
+	hev_event_source_set_callback (source, timeout_handler, NULL, NULL);
+	hev_event_loop_add_source (loop, source);
+	hev_event_source_unref (source);
 
 	source = hev_event_source_signal_new (SIGINT);
 	hev_event_source_set_callback (source, signal_int_handler, loop, NULL);
