@@ -53,22 +53,21 @@ ring_buffer_free (RingBuffer *self)
 }
 
 int
-ring_buffer_reading (RingBuffer *self, struct iovec **iovec)
+ring_buffer_reading (RingBuffer *self, struct iovec *iovec)
 {
-	if (self) {
+	if (self && iovec) {
 		int len = self->wp - self->rp;
 
 		if (0 <= len) {
-			*iovec = HEV_MEMORY_ALLOCATOR_ALLOC (sizeof (struct iovec));
-			(*iovec)[0].iov_base = self->buffer + self->rp;
-			(*iovec)[0].iov_len = len;
+			iovec[0].iov_base = self->buffer + self->rp;
+			iovec[0].iov_len = len;
 			return 1;
 		} else {
-			*iovec = HEV_MEMORY_ALLOCATOR_ALLOC (sizeof (struct iovec) * 2);
-			(*iovec)[0].iov_base = self->buffer + self->rp;
-			(*iovec)[0].iov_len = self->len - self->rp;
-			(*iovec)[1].iov_base = self->buffer;
-			(*iovec)[1].iov_len = self->wp;
+			iovec = HEV_MEMORY_ALLOCATOR_ALLOC (sizeof (struct iovec) * 2);
+			iovec[0].iov_base = self->buffer + self->rp;
+			iovec[0].iov_len = self->len - self->rp;
+			iovec[1].iov_base = self->buffer;
+			iovec[1].iov_len = self->wp;
 			return 2;
 		}
 	}
@@ -77,7 +76,7 @@ ring_buffer_reading (RingBuffer *self, struct iovec **iovec)
 }
 
 void
-ring_buffer_read_finish (RingBuffer *self, struct iovec *iovec, unsigned int inc_len)
+ring_buffer_read_finish (RingBuffer *self, unsigned int inc_len)
 {
 	if (self) {
 		unsigned int p = inc_len + self->rp;
@@ -91,32 +90,29 @@ ring_buffer_read_finish (RingBuffer *self, struct iovec *iovec, unsigned int inc
 			self->wp = 0;
 			self->full = false;
 		}
-		HEV_MEMORY_ALLOCATOR_FREE (iovec);
 	}
 }
 
 int
-ring_buffer_writing (RingBuffer *self, struct iovec **iovec)
+ring_buffer_writing (RingBuffer *self, struct iovec *iovec)
 {
 	if (self) {
 		int len = self->rp - self->wp;
 
 		if (0 <= len) {
-			*iovec = HEV_MEMORY_ALLOCATOR_ALLOC (sizeof (struct iovec));
 			if ((0 == len) && !self->full) {
-				(*iovec)[0].iov_base = self->buffer;
-				(*iovec)[0].iov_len = self->len;
+				iovec[0].iov_base = self->buffer;
+				iovec[0].iov_len = self->len;
 			} else {
-				(*iovec)[0].iov_base = self->buffer + self->wp;
-				(*iovec)[0].iov_len = len;
+				iovec[0].iov_base = self->buffer + self->wp;
+				iovec[0].iov_len = len;
 			}
 			return 1;
 		} else {
-			*iovec = HEV_MEMORY_ALLOCATOR_ALLOC (sizeof (struct iovec) * 2);
-			(*iovec)[0].iov_base = self->buffer + self->wp;
-			(*iovec)[0].iov_len = self->len - self->wp;
-			(*iovec)[1].iov_base = self->buffer;
-			(*iovec)[1].iov_len = self->rp;
+			iovec[0].iov_base = self->buffer + self->wp;
+			iovec[0].iov_len = self->len - self->wp;
+			iovec[1].iov_base = self->buffer;
+			iovec[1].iov_len = self->rp;
 			return 2;
 		}
 	}
@@ -125,7 +121,7 @@ ring_buffer_writing (RingBuffer *self, struct iovec **iovec)
 }
 
 void
-ring_buffer_write_finish (RingBuffer *self, struct iovec *iovec, unsigned int inc_len)
+ring_buffer_write_finish (RingBuffer *self, unsigned int inc_len)
 {
 	if (self) {
 		unsigned int p = inc_len + self->wp;
@@ -136,7 +132,6 @@ ring_buffer_write_finish (RingBuffer *self, struct iovec *iovec, unsigned int in
 		}
 		if (self->wp == self->rp)
 		  self->full = true;
-		HEV_MEMORY_ALLOCATOR_FREE (iovec);
 	}
 }
 
@@ -155,7 +150,7 @@ client_source_handler (HevEventSourceFD *fd, void *data)
 {
 	RingBuffer *buffer = NULL;
 	struct msghdr mh;
-	struct iovec *iovec = NULL;
+	struct iovec iovec[2];
 	int iovec_len = 0;
 	unsigned int inc_len = 0;
 	ssize_t size = 0;
@@ -163,12 +158,12 @@ client_source_handler (HevEventSourceFD *fd, void *data)
 	memset (&mh, 0, sizeof (mh));
 	buffer = hev_event_source_fd_get_data (fd);
 	if (EPOLLIN & fd->revents) {
-		iovec_len = ring_buffer_writing (buffer, &iovec);
+		iovec_len = ring_buffer_writing (buffer, iovec);
 		mh.msg_iov = iovec;
 		mh.msg_iovlen = iovec_len;
 		size = recvmsg (fd->fd, &mh, 0);
 		inc_len = (0 > size) ? 0 : size;
-		ring_buffer_write_finish (buffer, iovec, inc_len);
+		ring_buffer_write_finish (buffer, inc_len);
 
 		if (0 == size) {
 			printf ("Client %d leave\n", fd->fd);
@@ -180,12 +175,12 @@ client_source_handler (HevEventSourceFD *fd, void *data)
 		fd->revents &= ~EPOLLIN;
 	}
 	if (EPOLLOUT & fd->revents) {
-		iovec_len = ring_buffer_reading (buffer, &iovec);
+		iovec_len = ring_buffer_reading (buffer, iovec);
 		mh.msg_iov = iovec;
 		mh.msg_iovlen = iovec_len;
 		size = sendmsg (fd->fd, &mh, 0);
 		inc_len = (0 > size) ? 0 : size;
-		ring_buffer_read_finish (buffer, iovec, inc_len);
+		ring_buffer_read_finish (buffer, inc_len);
 
 		fd->revents &= ~EPOLLOUT;
 	}
