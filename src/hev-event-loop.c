@@ -137,6 +137,7 @@ hev_event_loop_add_source (HevEventLoop *self, HevEventSource *source)
 {
 	if (self && source) {
 		HevSList *list = NULL;
+		_hev_event_source_set_loop (source, self);
 		self->sources = hev_slist_append (self->sources, hev_event_source_ref (source));
 		for (list=source->fds; list; list=hev_slist_next (list)) {
 			HevEventSourceFD *fd = hev_slist_data (list);
