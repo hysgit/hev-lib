@@ -43,7 +43,7 @@ hev_event_source_timeout_new (unsigned int interval)
 		HevEventSourceTimeout *self = (HevEventSourceTimeout *) source;
 		self->timer_fd = timerfd_create (CLOCK_MONOTONIC, TFD_NONBLOCK);
 		self->interval = interval;
-		hev_event_source_add_fd (source, self->timer_fd, EPOLLIN | EPOLLET, NULL);
+		hev_event_source_add_fd (source, self->timer_fd, EPOLLIN | EPOLLET);
 	}
 
 	return source;
