@@ -7,6 +7,7 @@
  ============================================================================
  */
 
+#include <stdio.h>
 #include <time.h>
 #include <unistd.h>
 #include <sys/epoll.h>
@@ -59,7 +60,7 @@ hev_event_source_timeout_prepare (HevEventSource *source)
 	spec.it_interval.tv_nsec = 0;
 	clock_gettime (CLOCK_MONOTONIC, &spec.it_value);
 	time = spec.it_value.tv_sec * 1000000000 + spec.it_value.tv_nsec;
-	time += self->interval * 1000000;
+	time += ((uint64_t) self->interval) * 1000000;
 	spec.it_value.tv_sec = time / 1000000000;
 	spec.it_value.tv_nsec = time % 1000000000;
 	timerfd_settime (self->timer_fd, TFD_TIMER_ABSTIME, &spec, NULL);
