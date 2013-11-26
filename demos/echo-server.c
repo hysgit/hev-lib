@@ -153,7 +153,7 @@ set_fd_nonblock (int fd, bool nonblock)
 static bool
 client_source_handler (HevEventSourceFD *fd, void *data)
 {
-	RingBuffer *buffer = fd->data;
+	RingBuffer *buffer = NULL;
 	struct msghdr mh;
 	struct iovec *iovec = NULL;
 	int iovec_len = 0;
@@ -161,6 +161,7 @@ client_source_handler (HevEventSourceFD *fd, void *data)
 	ssize_t size = 0;
 
 	memset (&mh, 0, sizeof (mh));
+	buffer = hev_event_source_fd_get_data (fd);
 	if (EPOLLIN & fd->revents) {
 		iovec_len = ring_buffer_writing (buffer, &iovec);
 		mh.msg_iov = iovec;
@@ -207,24 +208,26 @@ listener_source_handler (HevEventSourceFD *fd, void *data)
 		printf ("Accept failed!\n");
 	} else {
 		RingBuffer *buffer = NULL;
+		HevEventSourceFD *_fd = NULL;
 		printf ("New client %d enter from %s:%u\n",
 			client_fd, inet_ntoa (addr.sin_addr), ntohs (addr.sin_port));
 		buffer = ring_buffer_new (1024);
 		set_fd_nonblock (client_fd, true);
-		hev_event_source_add_fd (client_source, client_fd, EPOLLIN | EPOLLOUT | EPOLLET, buffer);
+		_fd = hev_event_source_add_fd (client_source, client_fd, EPOLLIN | EPOLLOUT | EPOLLET);
+		hev_event_source_fd_set_data (_fd, buffer);
 	}
 
 	return true;
 }
 
 static bool
-signal_pipe_handler (HevEventSourceFD *fd, void *data)
+signal_pipe_handler (void *data)
 {
 	return true;
 }
 
 static bool
-signal_int_handler (HevEventSourceFD *fd, void *data)
+signal_int_handler (void *data)
 {
 	HevEventLoop *loop = data;
 
@@ -257,14 +260,16 @@ main (int argc, char *argv[])
 	if (0 > listen (fd, 5))
 	  exit (3);
 
-	client_source = hev_event_source_new (NULL, sizeof (HevEventSource));
-	hev_event_source_set_callback (client_source, client_source_handler, NULL, NULL);
+	client_source = hev_event_source_fds_new ();
+	hev_event_source_set_callback (client_source,
+				(HevEventSourceFunc) client_source_handler, NULL, NULL);
 	hev_event_loop_add_source (loop, client_source);
 	hev_event_source_unref (client_source);
 
-	listener_source = hev_event_source_new (NULL, sizeof (HevEventSource));
-	hev_event_source_add_fd (listener_source, fd, EPOLLIN | EPOLLET, NULL);
-	hev_event_source_set_callback (listener_source, listener_source_handler, client_source, NULL);
+	listener_source = hev_event_source_fds_new ();
+	hev_event_source_add_fd (listener_source, fd, EPOLLIN | EPOLLET);
+	hev_event_source_set_callback (listener_source,
+				(HevEventSourceFunc) listener_source_handler, client_source, NULL);
 	hev_event_loop_add_source (loop, listener_source);
 	hev_event_source_unref (listener_source);
 
