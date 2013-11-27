@@ -75,8 +75,6 @@ hev_event_source_unref (HevEventSource *self)
 			for (list=self->fds; list; list=hev_slist_next (list))
 			  hev_event_source_fd_unref (hev_slist_data (list));
 			hev_slist_free (self->fds);
-			if (self->loop)
-			  hev_event_loop_unref (self->loop);
 			HEV_MEMORY_ALLOCATOR_FREE (self);
 		}
 	}
@@ -177,7 +175,7 @@ void
 _hev_event_source_set_loop (HevEventSource *self, HevEventLoop *loop)
 {
 	if (self && (!self->loop) && loop)
-	  self->loop = hev_event_loop_ref (loop);
+	  self->loop = loop;
 }
 
 static bool
