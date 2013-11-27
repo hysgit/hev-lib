@@ -9,6 +9,7 @@
 
 #include <hev-lib.h>
 #include <stdio.h>
+#include <errno.h>
 #include <stdint.h>
 #include <string.h>
 #include <signal.h>
@@ -165,39 +166,61 @@ client_source_handler (HevEventSourceFD *fd, void *data)
 	int iovec_len = 0;
 	unsigned int inc_len = 0;
 	ssize_t size = 0;
+	bool bin = false, bout = false;
 
 	memset (&mh, 0, sizeof (mh));
 	client = hev_event_source_fd_get_data (fd);
-	if (EPOLLIN & fd->revents) {
-		iovec_len = ring_buffer_writing (client->buffer, iovec);
-		mh.msg_iov = iovec;
-		mh.msg_iovlen = iovec_len;
-		size = recvmsg (fd->fd, &mh, 0);
-		inc_len = (0 > size) ? 0 : size;
-		ring_buffer_write_finish (client->buffer, inc_len);
+	for (; !bin && !bout;) {
+		if (EPOLLIN & fd->revents) {
+			iovec_len = ring_buffer_writing (client->buffer, iovec);
+			mh.msg_iov = iovec;
+			mh.msg_iovlen = iovec_len;
+			size = recvmsg (fd->fd, &mh, 0);
+			inc_len = (0 > size) ? 0 : size;
+			ring_buffer_write_finish (client->buffer, inc_len);
 
-		if (0 == size) {
-			printf ("Client %d leave\n", fd->fd);
-			close (fd->fd);
-			hev_event_source_del_fd (fd->source, fd->fd);
-			ring_buffer_free (client->buffer);
-			client_list = hev_slist_remove (client_list, client);
-			HEV_MEMORY_ALLOCATOR_FREE (client);
+			if (-1 == size) {
+				if ((EAGAIN == errno) || (EWOULDBLOCK == errno)) {
+					fd->revents &= ~EPOLLIN;
+					bin = true;
+				} else {
+					goto remove_client;
+				}
+			} else if (0 == size) {
+				bin = true;
+			}
 		}
+		if (EPOLLOUT & fd->revents) {
+			iovec_len = ring_buffer_reading (client->buffer, iovec);
+			mh.msg_iov = iovec;
+			mh.msg_iovlen = iovec_len;
+			size = sendmsg (fd->fd, &mh, 0);
+			inc_len = (0 > size) ? 0 : size;
+			ring_buffer_read_finish (client->buffer, inc_len);
 
-		fd->revents &= ~EPOLLIN;
-	}
-	if (EPOLLOUT & fd->revents) {
-		iovec_len = ring_buffer_reading (client->buffer, iovec);
-		mh.msg_iov = iovec;
-		mh.msg_iovlen = iovec_len;
-		size = sendmsg (fd->fd, &mh, 0);
-		inc_len = (0 > size) ? 0 : size;
-		ring_buffer_read_finish (client->buffer, inc_len);
-
-		fd->revents &= ~EPOLLOUT;
+			if (-1 == size) {
+				if ((EAGAIN == errno) || (EWOULDBLOCK == errno)) {
+					fd->revents &= ~EPOLLOUT;
+					bout = true;
+				} else {
+					goto remove_client;
+				}
+			} else if (0 == size) {
+				bout = true;
+			}
+		}
 	}
 	client->idle = false;
+
+	return true;
+
+remove_client:
+	printf ("Client %d leave\n", fd->fd);
+	close (fd->fd);
+	hev_event_source_del_fd (fd->source, fd->fd);
+	ring_buffer_free (client->buffer);
+	client_list = hev_slist_remove (client_list, client);
+	HEV_MEMORY_ALLOCATOR_FREE (client);
 
 	return true;
 }
