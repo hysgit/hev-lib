@@ -47,5 +47,12 @@ hev_event_source_fd_get_data (HevEventSourceFD *self)
 	return self ? self->data : NULL;
 }
 
+static inline void
+_hev_event_source_fd_clear_source (HevEventSourceFD *self)
+{
+	if (self)
+	  self->source = NULL;
+}
+
 #endif /* __HEV_EVENT_SOURCE_H__ */
 

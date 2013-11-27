@@ -72,8 +72,10 @@ hev_event_source_unref (HevEventSource *self)
 			  HEV_MEMORY_ALLOCATOR_FREE (self->name);
 			if (self->callback.notify)
 			  self->callback.notify (self->callback.data);
-			for (list=self->fds; list; list=hev_slist_next (list))
-			  hev_event_source_fd_unref (hev_slist_data (list));
+			for (list=self->fds; list; list=hev_slist_next (list)) {
+				_hev_event_source_fd_clear_source (hev_slist_data (list));
+				hev_event_source_fd_unref (hev_slist_data (list));
+			}
 			hev_slist_free (self->fds);
 			HEV_MEMORY_ALLOCATOR_FREE (self);
 		}
