@@ -180,7 +180,7 @@ client_source_handler (HevEventSourceFD *fd, void *data)
 			ring_buffer_write_finish (client->buffer, inc_len);
 
 			if (-1 == size) {
-				if ((EAGAIN == errno) || (EWOULDBLOCK == errno)) {
+				if (EAGAIN == errno) {
 					fd->revents &= ~EPOLLIN;
 					bin = true;
 				} else {
@@ -199,7 +199,7 @@ client_source_handler (HevEventSourceFD *fd, void *data)
 			ring_buffer_read_finish (client->buffer, inc_len);
 
 			if (-1 == size) {
-				if ((EAGAIN == errno) || (EWOULDBLOCK == errno)) {
+				if (EAGAIN == errno) {
 					fd->revents &= ~EPOLLOUT;
 					bout = true;
 				} else {
@@ -234,23 +234,26 @@ listener_source_handler (HevEventSourceFD *fd, void *data)
 	int client_fd = 0;
 
 	addr_len = sizeof (addr);
-	client_fd = accept (fd->fd, (struct sockaddr *) &addr,
-				(socklen_t *) &addr_len);
-	if (0 > client_fd) {
-		printf ("Accept failed!\n");
-	} else {
-		Client *client = NULL;
-		HevEventSourceFD *_fd = NULL;
-		printf ("New client %d enter from %s:%u\n",
-			client_fd, inet_ntoa (addr.sin_addr), ntohs (addr.sin_port));
-		set_fd_nonblock (client_fd, true);
-		_fd = hev_event_source_add_fd (client_source, client_fd, EPOLLIN | EPOLLOUT | EPOLLET);
-		client = HEV_MEMORY_ALLOCATOR_ALLOC (sizeof (Client));
-		client->buffer = ring_buffer_new (1024);
-		client->idle = false;
-		client->fd = _fd;
-		hev_event_source_fd_set_data (_fd, client);
-		client_list = hev_slist_append (client_list, client);
+	for (;;) {
+		client_fd = accept (fd->fd, (struct sockaddr *) &addr,
+					(socklen_t *) &addr_len);
+		if (0 > client_fd) {
+			if ((EAGAIN == errno) || (EMFILE == errno))
+			  break;
+		} else {
+			Client *client = NULL;
+			HevEventSourceFD *_fd = NULL;
+			printf ("New client %d enter from %s:%u\n",
+				client_fd, inet_ntoa (addr.sin_addr), ntohs (addr.sin_port));
+			set_fd_nonblock (client_fd, true);
+			_fd = hev_event_source_add_fd (client_source, client_fd, EPOLLIN | EPOLLOUT | EPOLLET);
+			client = HEV_MEMORY_ALLOCATOR_ALLOC (sizeof (Client));
+			client->buffer = ring_buffer_new (1024);
+			client->idle = false;
+			client->fd = _fd;
+			hev_event_source_fd_set_data (_fd, client);
+			client_list = hev_slist_append (client_list, client);
+		}
 	}
 
 	return true;
@@ -312,7 +315,7 @@ main (int argc, char *argv[])
 	addr.sin_port = htons (8000);
 	if (0 > bind (fd, (struct sockaddr *) &addr, (socklen_t) sizeof (addr)))
 	  exit (2);
-	if (0 > listen (fd, 5))
+	if (0 > listen (fd, 100))
 	  exit (3);
 
 	client_source = hev_event_source_fds_new ();
@@ -322,6 +325,7 @@ main (int argc, char *argv[])
 	hev_event_source_unref (client_source);
 
 	listener_source = hev_event_source_fds_new ();
+	hev_event_source_set_priority (listener_source, 1);
 	hev_event_source_add_fd (listener_source, fd, EPOLLIN | EPOLLET);
 	hev_event_source_set_callback (listener_source,
 				(HevEventSourceFunc) listener_source_handler, client_source, NULL);
