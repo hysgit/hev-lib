@@ -75,7 +75,8 @@ hev_event_loop_run (HevEventLoop *self)
 	while (self->run) {
 		struct epoll_event events[256];
 		int i = 0, nfds = 0;
-		HevSList *handle_fd = NULL;
+		unsigned int sp = 0;
+		HevSList *handle_fd = NULL, *fd_sub_list = fd_list;
 
 		/* waiting events */
 		nfds = epoll_wait (self->epoll_fd, events, 256, timeout);
@@ -84,19 +85,25 @@ hev_event_loop_run (HevEventLoop *self)
 			HevSList *list = NULL;
 			HevEventSourceFD *fd = events[i].data.ptr;
 			HevEventSource *source = fd->source;
+			unsigned int cp = 0;
 			fd->revents |= events[i].events;
 			for (list=fd_list; list; list=hev_slist_next (list)) {
 				HevEventSourceFD *_fd  = hev_slist_data (list);
 				HevEventSource *_source = _fd->source;
+				cp ++;
 				if (hev_event_source_get_priority (source) <
 						hev_event_source_get_priority (_source))
 				  break;
 			}
 			fd = _hev_event_source_fd_ref (fd);
 			fd_list = hev_slist_insert_before (fd_list, fd, list);
+			if (cp >= sp) {
+				sp = cp;
+				fd_sub_list = list ? list : fd_list;
+			}
 		}
 		/* get highest priority source fd, check & dispatch */
-		handle_fd = hev_slist_last (fd_list);
+		handle_fd = hev_slist_last (fd_sub_list);
 		if (handle_fd) {
 			HevSList *invalid_sources = NULL;
 			HevEventSourceFD *fd = hev_slist_data (handle_fd);
@@ -109,7 +116,7 @@ hev_event_loop_run (HevEventLoop *self)
 					invalid_sources = hev_slist_append (invalid_sources, source);
 				}
 			}
-			fd_list = hev_slist_remove (fd_list, fd);
+			fd_list = hev_slist_remove (fd_sub_list, fd);
 			_hev_event_source_fd_unref (fd);
 			/* delete invalid sources */
 			if (invalid_sources) {
