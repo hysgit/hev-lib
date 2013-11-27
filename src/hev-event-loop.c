@@ -92,7 +92,7 @@ hev_event_loop_run (HevEventLoop *self)
 						hev_event_source_get_priority (_source))
 				  break;
 			}
-			fd = hev_event_source_fd_ref (fd);
+			fd = _hev_event_source_fd_ref (fd);
 			fd_list = hev_slist_insert_before (fd_list, fd, list);
 		}
 		/* get highest priority source fd, check & dispatch */
@@ -110,7 +110,7 @@ hev_event_loop_run (HevEventLoop *self)
 				}
 			}
 			fd_list = hev_slist_remove (fd_list, fd);
-			hev_event_source_fd_unref (fd);
+			_hev_event_source_fd_unref (fd);
 			/* delete invalid sources */
 			if (invalid_sources) {
 				HevSList *list = NULL;

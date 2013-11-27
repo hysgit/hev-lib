@@ -30,7 +30,7 @@ struct _HevEventSourceFD
 };
 
 static inline HevEventSourceFD *
-hev_event_source_fd_new (HevEventSource *source, int fd, uint32_t events)
+_hev_event_source_fd_new (HevEventSource *source, int fd, uint32_t events)
 {
 	HevEventSourceFD *self = HEV_MEMORY_ALLOCATOR_ALLOC (sizeof (HevEventSourceFD));
 	if (self) {
@@ -46,7 +46,7 @@ hev_event_source_fd_new (HevEventSource *source, int fd, uint32_t events)
 }
 
 static inline HevEventSourceFD *
-hev_event_source_fd_ref (HevEventSourceFD *self)
+_hev_event_source_fd_ref (HevEventSourceFD *self)
 {
 	if (self) {
 		self->_ref_count ++;
@@ -57,7 +57,7 @@ hev_event_source_fd_ref (HevEventSourceFD *self)
 }
 
 static inline void
-hev_event_source_fd_unref (HevEventSourceFD *self)
+_hev_event_source_fd_unref (HevEventSourceFD *self)
 {
 	if (self) {
 		self->_ref_count --;
