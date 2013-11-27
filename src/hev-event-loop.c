@@ -100,7 +100,7 @@ hev_event_loop_run (HevEventLoop *self)
 			HevSList *invalid_sources = NULL;
 			HevEventSourceFD *fd = hev_slist_data (handle_fd);
 			HevEventSource *source = fd->source;
-			if (source->funcs.check (source, fd)) {
+			if (source && source->funcs.check (source, fd)) {
 				if (source->funcs.dispatch (source, fd,
 					source->callback.callback, source->callback.data)) {
 					source->funcs.prepare (source);
