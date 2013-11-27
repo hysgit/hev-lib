@@ -170,7 +170,7 @@ _hev_event_loop_add_fd (HevEventLoop *self, HevEventSourceFD *fd)
 {
 	if (self && fd) {
 		struct epoll_event event;
-		event.events = fd->events;
+		event.events = fd->_events;
 		event.data.ptr = fd;
 		return (0 == epoll_ctl (self->epoll_fd,
 					EPOLL_CTL_ADD, fd->fd, &event));

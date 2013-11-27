@@ -73,7 +73,7 @@ hev_event_source_unref (HevEventSource *self)
 			if (self->callback.notify)
 			  self->callback.notify (self->callback.data);
 			for (list=self->fds; list; list=hev_slist_next (list))
-			  HEV_MEMORY_ALLOCATOR_FREE (hev_slist_data (list));
+			  hev_event_source_fd_unref (hev_slist_data (list));
 			hev_slist_free (self->fds);
 			if (self->loop)
 			  hev_event_loop_unref (self->loop);
@@ -127,16 +127,11 @@ HevEventSourceFD *
 hev_event_source_add_fd (HevEventSource *self, int fd, uint32_t events)
 {
 	if (self) {
-		HevEventSourceFD *efd = HEV_MEMORY_ALLOCATOR_ALLOC (sizeof (HevEventSourceFD));
+		HevEventSourceFD *efd = hev_event_source_fd_new (self, fd, events);
 		if (efd) {
-			efd->fd = fd;
-			efd->events = events;
-			efd->revents = 0;
-			efd->source = self;
-			efd->data = NULL;
 			self->fds = hev_slist_append (self->fds, efd);
 			if (self->loop && !_hev_event_loop_add_fd (self->loop, efd)) {
-				HEV_MEMORY_ALLOCATOR_FREE (efd);
+				hev_event_source_fd_unref (efd);
 				efd = NULL;
 			}
 			return efd;
@@ -164,7 +159,7 @@ hev_event_source_del_fd (HevEventSource *self, int fd)
 			self->fds = hev_slist_remove (self->fds, rfd);
 			if (self->loop)
 			  res = _hev_event_loop_del_fd (self->loop, rfd);
-			HEV_MEMORY_ALLOCATOR_FREE (rfd);
+			hev_event_source_fd_unref (rfd);
 			return res;
 		}
 	}

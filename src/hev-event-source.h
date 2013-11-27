@@ -20,19 +20,10 @@
 #include "hev-slist.h"
 
 typedef struct _HevEventSource HevEventSource;
-typedef struct _HevEventSourceFD HevEventSourceFD;
 typedef struct _HevEventSourceFuncs HevEventSourceFuncs;
 typedef bool (*HevEventSourceFunc) (void *data);
 
-struct _HevEventSourceFD
-{
-	int fd;
-	uint32_t events;
-	uint32_t revents;
-
-	HevEventSource *source;
-	void *data;
-};
+#include "hev-event-source-fd.h"
 
 struct _HevEventSourceFuncs
 {
@@ -79,19 +70,6 @@ bool hev_event_source_del_fd (HevEventSource *self, int fd);
 
 HevEventLoop * hev_event_source_get_loop (HevEventSource *self);
 void _hev_event_source_set_loop (HevEventSource *self, HevEventLoop *loop);
-
-static inline void
-hev_event_source_fd_set_data (HevEventSourceFD *fd, void *data)
-{
-	if (fd)
-	  fd->data = data;
-}
-
-static inline void *
-hev_event_source_fd_get_data (HevEventSourceFD *fd)
-{
-	return fd ? fd->data : NULL;
-}
 
 #endif /* __HEV_EVENT_SOURCE_H__ */
 
