@@ -159,6 +159,7 @@ hev_event_source_del_fd (HevEventSource *self, int fd)
 			self->fds = hev_slist_remove (self->fds, rfd);
 			if (self->loop)
 			  res = _hev_event_loop_del_fd (self->loop, rfd);
+			_hev_event_source_fd_clear_source (rfd);
 			hev_event_source_fd_unref (rfd);
 			return res;
 		}
