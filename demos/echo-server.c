@@ -234,12 +234,15 @@ listener_source_handler (HevEventSourceFD *fd, void *data)
 	int client_fd = 0;
 
 	addr_len = sizeof (addr);
-	for (;;) {
+	for (; EPOLLIN & fd->revents;) {
 		client_fd = accept (fd->fd, (struct sockaddr *) &addr,
 					(socklen_t *) &addr_len);
 		if (0 > client_fd) {
-			if ((EAGAIN == errno) || (EMFILE == errno))
-			  break;
+			if (EAGAIN == errno)
+			  fd->revents &= ~EPOLLIN;
+			else
+			  printf ("Accept failed!\n");
+			break;
 		} else {
 			Client *client = NULL;
 			HevEventSourceFD *_fd = NULL;
