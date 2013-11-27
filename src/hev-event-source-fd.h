@@ -29,10 +29,43 @@ struct _HevEventSourceFD
 	void *data;
 };
 
-inline HevEventSourceFD * hev_event_source_fd_new (HevEventSource *source, int fd, uint32_t events);
+static inline HevEventSourceFD *
+hev_event_source_fd_new (HevEventSource *source, int fd, uint32_t events)
+{
+	HevEventSourceFD *self = HEV_MEMORY_ALLOCATOR_ALLOC (sizeof (HevEventSourceFD));
+	if (self) {
+		self->fd = fd;
+		self->_events = events;
+		self->revents = 0;
+		self->_ref_count = 1;
+		self->source = source;
+		self->data = NULL;
+	}
 
-inline HevEventSourceFD * hev_event_source_fd_ref (HevEventSourceFD *self);
-inline void hev_event_source_fd_unref (HevEventSourceFD *self);
+	return self;
+}
+
+static inline HevEventSourceFD *
+hev_event_source_fd_ref (HevEventSourceFD *self)
+{
+	if (self) {
+		self->_ref_count ++;
+		return self;
+	}
+
+	return NULL;
+}
+
+static inline void
+hev_event_source_fd_unref (HevEventSourceFD *self)
+{
+	if (self) {
+		self->_ref_count --;
+		if (0 == self->_ref_count) {
+			HEV_MEMORY_ALLOCATOR_FREE (self);
+		}
+	}
+}
 
 static inline void
 hev_event_source_fd_set_data (HevEventSourceFD *self, void *data)
