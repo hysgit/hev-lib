@@ -30,6 +30,13 @@ hev_list_data (HevList *self)
 	return self ? *((void **) self) : NULL;
 }
 
+static inline void
+hev_list_set_data (HevList *self, void *data)
+{
+	if (self)
+	  *((void **) self) = data;
+}
+
 unsigned int hev_list_length (HevList *self);
 
 void hev_list_free (HevList *self);
