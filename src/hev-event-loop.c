@@ -63,6 +63,20 @@ hev_event_loop_unref (HevEventLoop *self)
 	}
 }
 
+static HevSList *
+insert_event_source_fd_sorted (HevSList *fd_list, HevEventSourceFD *fd)
+{
+	HevSList *list = NULL;
+
+	for (list=fd_list; list; list=hev_slist_next (list)) {
+		HevEventSourceFD *_fd  = hev_slist_data (list);
+		if (hev_event_source_get_priority (fd->source) >
+				hev_event_source_get_priority (_fd->source))
+		  break;
+	}
+	return hev_slist_insert_before (fd_list, fd, list);
+}
+
 void
 hev_event_loop_run (HevEventLoop *self)
 {
@@ -80,17 +94,10 @@ hev_event_loop_run (HevEventLoop *self)
 		nfds = epoll_wait (self->epoll_fd, events, 256, timeout);
 		/* insert to fd_list, sorted by source priority (highest ... lowest) */
 		for (i=0; i<nfds; i++) {
-			HevSList *list = NULL;
 			HevEventSourceFD *fd = events[i].data.ptr;
 			fd->revents |= events[i].events;
-			for (list=fd_list; list; list=hev_slist_next (list)) {
-				HevEventSourceFD *_fd  = hev_slist_data (list);
-				if (hev_event_source_get_priority (fd->source) >
-						hev_event_source_get_priority (_fd->source))
-				  break;
-			}
 			fd = _hev_event_source_fd_ref (fd);
-			fd_list = hev_slist_insert_before (fd_list, fd, list);
+			fd_list = insert_event_source_fd_sorted (fd_list, fd);
 		}
 		/* get highest priority source fd, check & dispatch */
 		if (fd_list) {
@@ -105,10 +112,11 @@ hev_event_loop_run (HevEventLoop *self)
 					invalid_sources = hev_slist_append (invalid_sources, source);
 				}
 			}
-			if (!(fd->_events & fd->revents) || !fd->source) {
-				fd_list = hev_slist_remove (fd_list, fd);
-				_hev_event_source_fd_unref (fd);
-			}
+			fd_list = hev_slist_remove (fd_list, fd);
+			if (!(fd->_events & fd->revents) || !fd->source)
+			  _hev_event_source_fd_unref (fd);
+			else
+			  fd_list = insert_event_source_fd_sorted (fd_list, fd);
 			/* delete invalid sources */
 			if (invalid_sources) {
 				HevSList *list = NULL;
