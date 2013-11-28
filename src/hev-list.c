@@ -199,13 +199,11 @@ HevList *
 hev_list_last (HevList *self)
 {
 	if (self) {
-		HevList **last = NULL;
-		for (last=&self; *last && (*last)->next;)
-		  last = &(*last)->next;
-		return *last;
+		while (self->next)
+		  self = self->next;
 	}
 
-	return NULL;
+	return self;
 }
 
 HevList *
