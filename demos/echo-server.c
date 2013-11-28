@@ -75,7 +75,6 @@ ring_buffer_reading (RingBuffer *self, struct iovec *iovec)
 			iovec[0].iov_len = len;
 			return 1;
 		} else {
-			iovec = HEV_MEMORY_ALLOCATOR_ALLOC (sizeof (struct iovec) * 2);
 			iovec[0].iov_base = self->buffer + self->rp;
 			iovec[0].iov_len = self->len - self->rp;
 			iovec[1].iov_base = self->buffer;
@@ -328,14 +327,15 @@ main (int argc, char *argv[])
 	hev_event_source_unref (client_source);
 
 	listener_source = hev_event_source_fds_new ();
-	hev_event_source_set_priority (listener_source, 1);
+	hev_event_source_set_priority (listener_source, 2);
 	hev_event_source_add_fd (listener_source, fd, EPOLLIN | EPOLLET);
 	hev_event_source_set_callback (listener_source,
 				(HevEventSourceFunc) listener_source_handler, client_source, NULL);
 	hev_event_loop_add_source (loop, listener_source);
 	hev_event_source_unref (listener_source);
 
-	source = hev_event_source_timeout_new (60* 1000);
+	source = hev_event_source_timeout_new (60 * 1000);
+	hev_event_source_set_priority (listener_source, 1);
 	hev_event_source_set_callback (source, timeout_handler, NULL, NULL);
 	hev_event_loop_add_source (loop, source);
 	hev_event_source_unref (source);
