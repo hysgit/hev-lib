@@ -66,15 +66,15 @@ hev_event_loop_unref (HevEventLoop *self)
 void
 hev_event_loop_run (HevEventLoop *self)
 {
-	HevSList *fd_list = NULL;
 	int timeout = -1;
+	HevSList *fd_list = NULL;
 
 	if (!self)
 	  return;
 
 	while (self->run) {
-		struct epoll_event events[256];
 		int i = 0, nfds = 0;
+		struct epoll_event events[256];
 
 		/* waiting events */
 		nfds = epoll_wait (self->epoll_fd, events, 256, timeout);
@@ -82,13 +82,11 @@ hev_event_loop_run (HevEventLoop *self)
 		for (i=0; i<nfds; i++) {
 			HevSList *list = NULL;
 			HevEventSourceFD *fd = events[i].data.ptr;
-			HevEventSource *source = fd->source;
 			fd->revents |= events[i].events;
 			for (list=fd_list; list; list=hev_slist_next (list)) {
 				HevEventSourceFD *_fd  = hev_slist_data (list);
-				HevEventSource *_source = _fd->source;
-				if (hev_event_source_get_priority (source) >
-						hev_event_source_get_priority (_source))
+				if (hev_event_source_get_priority (fd->source) >
+						hev_event_source_get_priority (_fd->source))
 				  break;
 			}
 			fd = _hev_event_source_fd_ref (fd);
