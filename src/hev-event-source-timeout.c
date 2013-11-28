@@ -7,8 +7,8 @@
  ============================================================================
  */
 
-#include <stdio.h>
 #include <time.h>
+#include <errno.h>
 #include <unistd.h>
 #include <sys/epoll.h>
 #include <sys/timerfd.h>
@@ -74,7 +74,11 @@ hev_event_source_timeout_check (HevEventSource *source, HevEventSourceFD *fd)
 	HevEventSourceTimeout *self = (HevEventSourceTimeout *) source;
 	if (EPOLLIN & fd->revents) {
 		uint64_t time;
-		read (self->timer_fd, &time, sizeof (uint64_t));
+		int size = read (self->timer_fd, &time, sizeof (uint64_t));
+		if (-1 == size) {
+			if (EAGAIN == errno)
+			  fd->revents &= ~EPOLLIN;
+		}
 		return true;
 	}
 

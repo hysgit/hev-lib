@@ -105,8 +105,10 @@ hev_event_loop_run (HevEventLoop *self)
 					invalid_sources = hev_slist_append (invalid_sources, source);
 				}
 			}
-			fd_list = hev_slist_remove (fd_list, fd);
-			_hev_event_source_fd_unref (fd);
+			if (!(fd->_events & fd->revents) || !fd->source) {
+				fd_list = hev_slist_remove (fd_list, fd);
+				_hev_event_source_fd_unref (fd);
+			}
 			/* delete invalid sources */
 			if (invalid_sources) {
 				HevSList *list = NULL;

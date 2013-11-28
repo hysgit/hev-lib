@@ -7,6 +7,7 @@
  ============================================================================
  */
 
+#include <errno.h>
 #include <unistd.h>
 #include <signal.h>
 #include <sys/epoll.h>
@@ -56,7 +57,11 @@ hev_event_source_signal_check (HevEventSource *source, HevEventSourceFD *fd)
 	HevEventSourceSignal *self = (HevEventSourceSignal *) source;
 	if (EPOLLIN & fd->revents) {
 		struct signalfd_siginfo siginfo;
-		read (self->signal_fd, &siginfo, sizeof (struct signalfd_siginfo));
+		int size = read (self->signal_fd, &siginfo, sizeof (struct signalfd_siginfo));
+		if (-1 == size) {
+			if (EAGAIN == errno)
+			  fd->revents &= ~EPOLLIN;
+		}
 		return true;
 	}
 

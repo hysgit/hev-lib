@@ -63,6 +63,7 @@ hev_event_source_idle_check (HevEventSource *source, HevEventSourceFD *fd)
 	if (EPOLLIN & fd->revents) {
 		eventfd_t val = 0;
 		eventfd_read (self->event_fd, &val);
+		fd->revents &= ~EPOLLIN;
 		return true;
 	}
 
