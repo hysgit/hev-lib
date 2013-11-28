@@ -168,13 +168,11 @@ HevSList *
 hev_slist_last (HevSList *self)
 {
 	if (self) {
-		HevSList **last = NULL;
-		for (last=&self; *last && (*last)->next;)
-		  last = &(*last)->next;
-		return *last;
+		while (self->next)
+		  self = self->next;
 	}
 
-	return NULL;
+	return self;
 }
 
 HevSList *
