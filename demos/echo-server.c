@@ -146,6 +146,30 @@ ring_buffer_write_finish (RingBuffer *self, unsigned int inc_len)
 	}
 }
 
+static Client *
+client_new (void)
+{
+	Client *client = HEV_MEMORY_ALLOCATOR_ALLOC (sizeof (Client));
+	if (client) {
+		client->fd = NULL;
+		client->buffer = NULL;
+		client->idle = false;
+	}
+
+	return client;
+}
+
+static void
+client_free (Client *client)
+{
+	if (client) {
+		close (client->fd->fd);
+		hev_event_source_del_fd (client->fd->source, client->fd->fd);
+		ring_buffer_free (client->buffer);
+		HEV_MEMORY_ALLOCATOR_FREE (client);
+	}
+}
+
 static bool
 set_fd_nonblock (int fd, bool nonblock)
 {
@@ -215,11 +239,8 @@ client_source_handler (HevEventSourceFD *fd, void *data)
 
 remove_client:
 	printf ("Client %d leave\n", fd->fd);
-	close (fd->fd);
-	hev_event_source_del_fd (fd->source, fd->fd);
-	ring_buffer_free (client->buffer);
+	client_free (client);
 	client_list = hev_slist_remove (client_list, client);
-	HEV_MEMORY_ALLOCATOR_FREE (client);
 
 	return true;
 }
@@ -243,17 +264,13 @@ listener_source_handler (HevEventSourceFD *fd, void *data)
 			  printf ("Accept failed!\n");
 			break;
 		} else {
-			Client *client = NULL;
-			HevEventSourceFD *_fd = NULL;
+			Client *client = client_new ();
+			client->buffer = ring_buffer_new (1024);
 			printf ("New client %d enter from %s:%u\n",
 				client_fd, inet_ntoa (addr.sin_addr), ntohs (addr.sin_port));
 			set_fd_nonblock (client_fd, true);
-			_fd = hev_event_source_add_fd (client_source, client_fd, EPOLLIN | EPOLLOUT | EPOLLET);
-			client = HEV_MEMORY_ALLOCATOR_ALLOC (sizeof (Client));
-			client->buffer = ring_buffer_new (1024);
-			client->idle = false;
-			client->fd = _fd;
-			hev_event_source_fd_set_data (_fd, client);
+			client->fd = hev_event_source_add_fd (client_source, client_fd, EPOLLIN | EPOLLOUT | EPOLLET);
+			hev_event_source_fd_set_data (client->fd, client);
 			client_list = hev_slist_append (client_list, client);
 		}
 	}
@@ -269,14 +286,12 @@ timeout_handler (void *data)
 		Client *client = hev_slist_data (list);
 		if (client->idle) {
 			printf ("Remove timeout client %d\n", client->fd->fd);
-			close (client->fd->fd);
-			hev_event_source_del_fd (client->fd->source, client->fd->fd);
-			ring_buffer_free (client->buffer);
-			client_list = hev_slist_remove (client_list, client);
-			HEV_MEMORY_ALLOCATOR_FREE (client);
+			client_free (client);
+			hev_slist_set_data (list, NULL);
 		}
 		client->idle = true;
 	}
+	client_list = hev_slist_remove_all (client_list, NULL);
 	return true;
 }
 
@@ -302,6 +317,7 @@ main (int argc, char *argv[])
 {
 	HevEventLoop *loop = NULL;
 	HevEventSource *source = NULL, *listener_source = NULL, *client_source = NULL;
+	HevSList *list = NULL;
 	int fd = 0;
 	struct sockaddr_in addr;
 
@@ -352,6 +368,11 @@ main (int argc, char *argv[])
 
 	hev_event_loop_run (loop);
 
+	for (list=client_list; list; list=hev_slist_next (list))
+	  client_free (hev_slist_data (list));
+	hev_slist_free (client_list);
+
+	close (fd);
 	hev_event_loop_unref (loop);
 
 	return 0;
