@@ -189,48 +189,44 @@ client_source_handler (HevEventSourceFD *fd, void *data)
 	int iovec_len = 0;
 	unsigned int inc_len = 0;
 	ssize_t size = 0;
-	bool bin = false, bout = false;
+	bool trysend = false;
 
 	memset (&mh, 0, sizeof (mh));
 	client = hev_event_source_fd_get_data (fd);
-	for (; !bin && !bout;) {
-		if (EPOLLIN & fd->revents) {
-			iovec_len = ring_buffer_writing (client->buffer, iovec);
-			mh.msg_iov = iovec;
-			mh.msg_iovlen = iovec_len;
-			size = recvmsg (fd->fd, &mh, 0);
-			inc_len = (0 > size) ? 0 : size;
-			ring_buffer_write_finish (client->buffer, inc_len);
+	if (EPOLLIN & fd->revents) {
+		iovec_len = ring_buffer_writing (client->buffer, iovec);
+		mh.msg_iov = iovec;
+		mh.msg_iovlen = iovec_len;
+		size = recvmsg (fd->fd, &mh, 0);
+		inc_len = (0 > size) ? 0 : size;
+		ring_buffer_write_finish (client->buffer, inc_len);
 
-			if (-1 == size) {
-				if (EAGAIN == errno) {
-					fd->revents &= ~EPOLLIN;
-					bin = true;
-				} else {
-					goto remove_client;
-				}
-			} else if (0 == size) {
-				bin = true;
+		if (-1 == size) {
+			if (EAGAIN == errno) {
+				fd->revents &= ~EPOLLIN;
+			} else {
+				goto remove_client;
 			}
+		} else if (0 < size) {
+			trysend = true;
 		}
-		if (EPOLLOUT & fd->revents) {
-			iovec_len = ring_buffer_reading (client->buffer, iovec);
-			mh.msg_iov = iovec;
-			mh.msg_iovlen = iovec_len;
-			size = sendmsg (fd->fd, &mh, 0);
-			inc_len = (0 > size) ? 0 : size;
-			ring_buffer_read_finish (client->buffer, inc_len);
+	}
+	if (trysend || (EPOLLOUT & fd->revents)) {
+		iovec_len = ring_buffer_reading (client->buffer, iovec);
+		mh.msg_iov = iovec;
+		mh.msg_iovlen = iovec_len;
+		size = sendmsg (fd->fd, &mh, 0);
+		inc_len = (0 > size) ? 0 : size;
+		ring_buffer_read_finish (client->buffer, inc_len);
 
-			if (-1 == size) {
-				if (EAGAIN == errno) {
-					fd->revents &= ~EPOLLOUT;
-					bout = true;
-				} else {
-					goto remove_client;
-				}
-			} else if (0 == size) {
-				bout = true;
+		if (-1 == size) {
+			if (EAGAIN == errno) {
+				fd->revents &= ~EPOLLOUT;
+			} else {
+				goto remove_client;
 			}
+		} else if (0 == size) {
+			fd->revents &= ~EPOLLOUT;
 		}
 	}
 	client->idle = false;
@@ -254,25 +250,22 @@ listener_source_handler (HevEventSourceFD *fd, void *data)
 	int client_fd = 0;
 
 	addr_len = sizeof (addr);
-	for (; EPOLLIN & fd->revents;) {
-		client_fd = accept (fd->fd, (struct sockaddr *) &addr,
-					(socklen_t *) &addr_len);
-		if (0 > client_fd) {
-			if (EAGAIN == errno)
-			  fd->revents &= ~EPOLLIN;
-			else
-			  printf ("Accept failed!\n");
-			break;
-		} else {
-			Client *client = client_new ();
-			client->buffer = ring_buffer_new (1024);
-			printf ("New client %d enter from %s:%u\n",
-				client_fd, inet_ntoa (addr.sin_addr), ntohs (addr.sin_port));
-			set_fd_nonblock (client_fd, true);
-			client->fd = hev_event_source_add_fd (client_source, client_fd, EPOLLIN | EPOLLOUT | EPOLLET);
-			hev_event_source_fd_set_data (client->fd, client);
-			client_list = hev_slist_append (client_list, client);
-		}
+	client_fd = accept (fd->fd, (struct sockaddr *) &addr,
+				(socklen_t *) &addr_len);
+	if (0 > client_fd) {
+		if (EAGAIN == errno)
+		  fd->revents &= ~EPOLLIN;
+		else
+		  printf ("Accept failed!\n");
+	} else {
+		Client *client = client_new ();
+		client->buffer = ring_buffer_new (1024);
+		printf ("New client %d enter from %s:%u\n",
+			client_fd, inet_ntoa (addr.sin_addr), ntohs (addr.sin_port));
+		set_fd_nonblock (client_fd, true);
+		client->fd = hev_event_source_add_fd (client_source, client_fd, EPOLLIN | EPOLLOUT | EPOLLET);
+		hev_event_source_fd_set_data (client->fd, client);
+		client_list = hev_slist_append (client_list, client);
 	}
 
 	return true;
@@ -318,12 +311,13 @@ main (int argc, char *argv[])
 	HevEventLoop *loop = NULL;
 	HevEventSource *source = NULL, *listener_source = NULL, *client_source = NULL;
 	HevSList *list = NULL;
-	int fd = 0;
+	int fd = 0, reuseaddr = 1;
 	struct sockaddr_in addr;
 
 	loop = hev_event_loop_new ();
 
 	fd = socket (AF_INET, SOCK_STREAM, 0);
+	setsockopt (fd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr, sizeof (reuseaddr));
 	set_fd_nonblock (fd, true);
 	if (0 > fd)
 	  exit (1);
