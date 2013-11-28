@@ -148,7 +148,7 @@ hev_slist_remove_all (HevSList *self, const void *data)
 	if (self) {
 		HevSList *node = NULL, *prev = NULL;
 		for (node=self; node;) {
-			HevSList *curr = prev = node;
+			HevSList *curr = node;
 			node = node->next;
 			if (data == curr->data) {
 				if (prev)
@@ -156,6 +156,8 @@ hev_slist_remove_all (HevSList *self, const void *data)
 				else
 				  self = curr->next;
 				HEV_MEMORY_ALLOCATOR_FREE (curr);
+			} else {
+				prev = curr;
 			}
 		}
 		return self;
