@@ -72,7 +72,7 @@ ring_buffer_reading (RingBuffer *self, struct iovec *iovec)
 	if (self && iovec) {
 		int len = self->wp - self->rp;
 
-		if (0 <= len) {
+		if ((0 <= len) && !self->full) {
 			iovec[0].iov_base = self->buffer + self->rp;
 			iovec[0].iov_len = len;
 			return 1;
@@ -92,11 +92,13 @@ void
 ring_buffer_read_finish (RingBuffer *self, unsigned int inc_len)
 {
 	if (self) {
-		unsigned int p = inc_len + self->rp;
-		if (self->len < p) {
-			self->rp = p - self->len;
-		} else {
-			self->rp = p;
+		if (0 < inc_len) {
+			unsigned int p = inc_len + self->rp;
+			if (self->len < p) {
+				self->rp = p - self->len;
+			} else {
+				self->rp = p;
+			}
 		}
 		if (self->wp == self->rp) {
 			self->rp = 0;
@@ -136,7 +138,7 @@ ring_buffer_writing (RingBuffer *self, struct iovec *iovec)
 void
 ring_buffer_write_finish (RingBuffer *self, unsigned int inc_len)
 {
-	if (self) {
+	if (self && (0 < inc_len)) {
 		unsigned int p = inc_len + self->wp;
 		if (self->len < p) {
 			self->wp = p - self->len;
@@ -191,6 +193,18 @@ set_fd_nonblock (int fd, bool nonblock)
 	return  true;
 }
 
+static size_t
+iovec_size (struct iovec *iovec, int len)
+{
+	int i = 0;
+	size_t size = 0;
+
+	for (i=0; i<len; i++)
+	  size += iovec[i].iov_len;
+
+	return size;
+}
+
 static bool
 session_source_handler (HevEventSourceFD *fd, void *data)
 {
@@ -200,11 +214,11 @@ session_source_handler (HevEventSourceFD *fd, void *data)
 	int iovec_len = 0;
 	unsigned int inc_len = 0;
 	ssize_t size = 0;
-	bool bin = false, bout = false;
 
 	memset (&mh, 0, sizeof (mh));
 	session = hev_event_source_fd_get_data (fd);
-	for (; !bin && !bout;) {
+
+	if (EPOLLIN & fd->revents) {
 		HevEventSourceFD *pair = NULL;
 		RingBuffer *buffer = NULL;
 		if (fd == session->client_fd) {
@@ -214,8 +228,10 @@ session_source_handler (HevEventSourceFD *fd, void *data)
 			pair = session->client_fd;
 			buffer = session->backward_buffer;
 		}
-		if (EPOLLIN & fd->revents) {
-			iovec_len = ring_buffer_writing (buffer, iovec);
+		/* get write buffer */
+		iovec_len = ring_buffer_writing (buffer, iovec);
+		if (0 < iovec_size (iovec, iovec_len)) {
+			/* recv data */
 			mh.msg_iov = iovec;
 			mh.msg_iovlen = iovec_len;
 			size = recvmsg (fd->fd, &mh, 0);
@@ -223,18 +239,17 @@ session_source_handler (HevEventSourceFD *fd, void *data)
 			ring_buffer_write_finish (buffer, inc_len);
 
 			if (-1 == size) {
-				if (EAGAIN == errno) {
-					fd->revents &= ~EPOLLIN;
-					bin = true;
-				} else {
-					goto remove_client;
-				}
+				if (EAGAIN == errno)
+				  fd->revents &= ~EPOLLIN;
+				else
+				  goto remove_session;
 			} else if (0 == size) {
-				bin = true;
+				goto remove_session;
 			}
 		}
-		if (EPOLLOUT & pair->revents) {
-			iovec_len = ring_buffer_reading (buffer, iovec);
+		/* try write */
+		iovec_len = ring_buffer_reading (buffer, iovec);
+		if (0 < iovec_size (iovec, iovec_len)) {
 			mh.msg_iov = iovec;
 			mh.msg_iovlen = iovec_len;
 			size = sendmsg (pair->fd, &mh, 0);
@@ -242,23 +257,44 @@ session_source_handler (HevEventSourceFD *fd, void *data)
 			ring_buffer_read_finish (buffer, inc_len);
 
 			if (-1 == size) {
-				if (EAGAIN == errno) {
-					pair->revents &= ~EPOLLOUT;
-					bout = true;
-				} else {
-					goto remove_client;
-				}
-			} else if (0 == size) {
-				bout = true;
+				if (EAGAIN != errno)
+				  goto remove_session;
 			}
 		}
 	}
+
+	if (EPOLLOUT & fd->revents) {
+		RingBuffer *buffer = NULL;
+		if (fd == session->client_fd)
+		  buffer = session->backward_buffer;
+		else
+		  buffer = session->forward_buffer;
+		/* try write */
+		iovec_len = ring_buffer_reading (buffer, iovec);
+		if (0 < iovec_size (iovec, iovec_len)) {
+			mh.msg_iov = iovec;
+			mh.msg_iovlen = iovec_len;
+			size = sendmsg (fd->fd, &mh, 0);
+			inc_len = (0 > size) ? 0 : size;
+			ring_buffer_read_finish (buffer, inc_len);
+
+			if (-1 == size) {
+				if (EAGAIN != errno)
+				  goto remove_session;
+			}
+		}
+		fd->revents &= ~EPOLLOUT;
+	}
+
+	if ((EPOLLERR | EPOLLHUP) & fd->revents)
+	  goto remove_session;
+
 	session->idle = false;
 
 	return true;
 
-remove_client:
-	printf ("Remove session %p\n", session);
+remove_session:
+	/* printf ("Remove session %p\n", session); */
 	session_free (session);
 	session_list = hev_slist_remove (session_list, session);
 
@@ -274,42 +310,39 @@ listener_source_handler (HevEventSourceFD *fd, void *data)
 	int client_fd = -1, remote_fd = -1;
 
 	addr_len = sizeof (addr);
-	for (; EPOLLIN & fd->revents;) {
-		client_fd = accept (fd->fd, (struct sockaddr *) &addr,
-					(socklen_t *) &addr_len);
-		if (0 > client_fd) {
-			if (EAGAIN == errno)
-			  fd->revents &= ~EPOLLIN;
-			else
-			  printf ("Accept failed!\n");
-			break;
-		} else {
-			Session *session = session_new ();
-			set_fd_nonblock (client_fd, true);
-			session->client_fd = hev_event_source_add_fd (session_source, client_fd,
-						EPOLLIN | EPOLLOUT | EPOLLET);
-			hev_event_source_fd_set_data (session->client_fd, session);
-			remote_fd = socket (AF_INET, SOCK_STREAM, 0);
-			set_fd_nonblock (remote_fd, true);
-			session->remote_fd = hev_event_source_add_fd (session_source, remote_fd,
-						EPOLLIN | EPOLLOUT | EPOLLET);
-			hev_event_source_fd_set_data (session->remote_fd, session);
-			memset (&raddr, 0, sizeof (raddr));
-			raddr.sin_family = AF_INET;
-			raddr.sin_addr.s_addr = inet_addr ("127.0.0.1");
-			raddr.sin_port = htons (22);
-			if ((0 > connect (remote_fd, (struct sockaddr *) &raddr,
-							sizeof (raddr))) && (EINPROGRESS != errno)) {
-				printf ("Connect to remote host failed, remove session %p\n", session);
-				session_free (session);
-				continue;
-			}
-			session->forward_buffer = ring_buffer_new (1024);
-			session->backward_buffer = ring_buffer_new (1024);
-			printf ("New session %p (%d, %d) enter from %s:%u\n", session,
-				client_fd, remote_fd, inet_ntoa (addr.sin_addr), ntohs (addr.sin_port));
-			session_list = hev_slist_append (session_list, session);
+	client_fd = accept (fd->fd, (struct sockaddr *) &addr,
+				(socklen_t *) &addr_len);
+	if (0 > client_fd) {
+		if (EAGAIN == errno)
+		  fd->revents &= ~EPOLLIN;
+		else
+		  printf ("Accept failed!\n");
+	} else {
+		Session *session = session_new ();
+		set_fd_nonblock (client_fd, true);
+		session->client_fd = hev_event_source_add_fd (session_source, client_fd,
+					EPOLLIN | EPOLLOUT | EPOLLET);
+		hev_event_source_fd_set_data (session->client_fd, session);
+		remote_fd = socket (AF_INET, SOCK_STREAM, 0);
+		set_fd_nonblock (remote_fd, true);
+		session->remote_fd = hev_event_source_add_fd (session_source, remote_fd,
+					EPOLLIN | EPOLLOUT | EPOLLET);
+		hev_event_source_fd_set_data (session->remote_fd, session);
+		memset (&raddr, 0, sizeof (raddr));
+		raddr.sin_family = AF_INET;
+		raddr.sin_addr.s_addr = inet_addr ("127.0.0.1");
+		raddr.sin_port = htons (22);
+		if ((0 > connect (remote_fd, (struct sockaddr *) &raddr,
+						sizeof (raddr))) && (EINPROGRESS != errno)) {
+			printf ("Connect to remote host failed, remove session %p\n", session);
+			session_free (session);
+			return true;
 		}
+		session->forward_buffer = ring_buffer_new (2000);
+		session->backward_buffer = ring_buffer_new (2000);
+		/* printf ("New session %p (%d, %d) enter from %s:%u\n", session,
+			client_fd, remote_fd, inet_ntoa (addr.sin_addr), ntohs (addr.sin_port)); */
+		session_list = hev_slist_append (session_list, session);
 	}
 
 	return true;
@@ -322,7 +355,7 @@ timeout_handler (void *data)
 	for (list=session_list; list; list=hev_slist_next (list)) {
 		Session *session = hev_slist_data (list);
 		if (session->idle) {
-			printf ("Remove timeout session %p\n", session);
+			/* printf ("Remove timeout session %p\n", session); */
 			session_free (session);
 			hev_slist_set_data (list, NULL);
 		}
@@ -355,12 +388,13 @@ main (int argc, char *argv[])
 	HevEventLoop *loop = NULL;
 	HevEventSource *source = NULL, *listener_source = NULL, *session_source = NULL;
 	HevSList *list = NULL;
-	int fd = -1;
+	int fd = -1, reuseaddr = 1;
 	struct sockaddr_in addr;
 
 	loop = hev_event_loop_new ();
 
 	fd = socket (AF_INET, SOCK_STREAM, 0);
+	setsockopt (fd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr, sizeof (reuseaddr));
 	set_fd_nonblock (fd, true);
 	if (0 > fd)
 	  exit (1);
@@ -394,6 +428,7 @@ main (int argc, char *argv[])
 	hev_event_source_unref (source);
 
 	source = hev_event_source_signal_new (SIGINT);
+	hev_event_source_set_priority (listener_source, 3);
 	hev_event_source_set_callback (source, signal_int_handler, loop, NULL);
 	hev_event_loop_add_source (loop, source);
 	hev_event_source_unref (source);
