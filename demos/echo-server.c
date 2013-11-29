@@ -89,7 +89,7 @@ ring_buffer_reading (RingBuffer *self, struct iovec *iovec)
 void
 ring_buffer_read_finish (RingBuffer *self, unsigned int inc_len)
 {
-	if (self) {
+	if (self && (0 < inc_len)) {
 		unsigned int p = inc_len + self->rp;
 		if (self->len < p) {
 			self->rp = p - self->len;
@@ -134,7 +134,7 @@ ring_buffer_writing (RingBuffer *self, struct iovec *iovec)
 void
 ring_buffer_write_finish (RingBuffer *self, unsigned int inc_len)
 {
-	if (self) {
+	if (self && (0 < inc_len)) {
 		unsigned int p = inc_len + self->wp;
 		if (self->len < p) {
 			self->wp = p - self->len;
@@ -180,6 +180,18 @@ set_fd_nonblock (int fd, bool nonblock)
 	return  true;
 }
 
+static size_t
+iovec_size (struct iovec *iovec, int len)
+{
+	int i = 0;
+	size_t size = 0;
+
+	for (i=0; i<len; i++)
+	  size += iovec[i].iov_len;
+
+	return size;
+}
+
 static bool
 client_source_handler (HevEventSourceFD *fd, void *data)
 {
@@ -189,46 +201,56 @@ client_source_handler (HevEventSourceFD *fd, void *data)
 	int iovec_len = 0;
 	unsigned int inc_len = 0;
 	ssize_t size = 0;
-	bool trysend = false;
+	bool trywrite = false;
 
 	memset (&mh, 0, sizeof (mh));
 	client = hev_event_source_fd_get_data (fd);
+
 	if (EPOLLIN & fd->revents) {
 		iovec_len = ring_buffer_writing (client->buffer, iovec);
-		mh.msg_iov = iovec;
-		mh.msg_iovlen = iovec_len;
-		size = recvmsg (fd->fd, &mh, 0);
-		inc_len = (0 > size) ? 0 : size;
-		ring_buffer_write_finish (client->buffer, inc_len);
+		/* get write buffer */
+		if (0 < iovec_size (iovec, iovec_len)) {
+			/* recv data */
+			mh.msg_iov = iovec;
+			mh.msg_iovlen = iovec_len;
+			size = recvmsg (fd->fd, &mh, 0);
+			inc_len = (0 > size) ? 0 : size;
+			ring_buffer_write_finish (client->buffer, inc_len);
 
-		if (-1 == size) {
-			if (EAGAIN == errno) {
-				fd->revents &= ~EPOLLIN;
-			} else {
+			if (-1 == size) {
+				if (EAGAIN == errno)
+				  fd->revents &= ~EPOLLIN;
+				else
+				  goto remove_client;
+			} else if (0 == size) {
 				goto remove_client;
 			}
-		} else if (0 < size) {
-			trysend = true;
 		}
+		/* activate try write */
+		trywrite = true;
 	}
-	if (trysend || (EPOLLOUT & fd->revents)) {
+
+	if ((EPOLLOUT & fd->revents) || trywrite ) {
+		/* try write */
 		iovec_len = ring_buffer_reading (client->buffer, iovec);
-		mh.msg_iov = iovec;
-		mh.msg_iovlen = iovec_len;
-		size = sendmsg (fd->fd, &mh, 0);
-		inc_len = (0 > size) ? 0 : size;
-		ring_buffer_read_finish (client->buffer, inc_len);
+		if (0 < iovec_size (iovec, iovec_len)) {
+			mh.msg_iov = iovec;
+			mh.msg_iovlen = iovec_len;
+			size = sendmsg (fd->fd, &mh, 0);
+			inc_len = (0 > size) ? 0 : size;
+			ring_buffer_read_finish (client->buffer, inc_len);
 
-		if (-1 == size) {
-			if (EAGAIN == errno) {
-				fd->revents &= ~EPOLLOUT;
-			} else {
-				goto remove_client;
+			if (-1 == size) {
+				if (EAGAIN != errno)
+				  goto remove_client;
 			}
-		} else if (0 == size) {
-			fd->revents &= ~EPOLLOUT;
 		}
+		fd->revents &= ~EPOLLOUT;
 	}
+
+	if ((EPOLLERR | EPOLLHUP) & fd->revents)
+	  goto remove_client;
+
 	client->idle = false;
 
 	return true;
@@ -344,13 +366,14 @@ main (int argc, char *argv[])
 	hev_event_loop_add_source (loop, listener_source);
 	hev_event_source_unref (listener_source);
 
-	source = hev_event_source_timeout_new (60 * 1000);
+	source = hev_event_source_timeout_new (30 * 1000);
 	hev_event_source_set_priority (listener_source, 1);
 	hev_event_source_set_callback (source, timeout_handler, NULL, NULL);
 	hev_event_loop_add_source (loop, source);
 	hev_event_source_unref (source);
 
 	source = hev_event_source_signal_new (SIGINT);
+	hev_event_source_set_priority (listener_source, 3);
 	hev_event_source_set_callback (source, signal_int_handler, loop, NULL);
 	hev_event_loop_add_source (loop, source);
 	hev_event_source_unref (source);
