@@ -70,7 +70,7 @@ ring_buffer_reading (RingBuffer *self, struct iovec *iovec)
 	if (self && iovec) {
 		int len = self->wp - self->rp;
 
-		if (0 <= len) {
+		if ((0 <= len) && !self->full) {
 			iovec[0].iov_base = self->buffer + self->rp;
 			iovec[0].iov_len = len;
 			return 1;
@@ -89,12 +89,14 @@ ring_buffer_reading (RingBuffer *self, struct iovec *iovec)
 void
 ring_buffer_read_finish (RingBuffer *self, unsigned int inc_len)
 {
-	if (self && (0 < inc_len)) {
-		unsigned int p = inc_len + self->rp;
-		if (self->len < p) {
-			self->rp = p - self->len;
-		} else {
-			self->rp = p;
+	if (self) {
+		if (0 < inc_len) {
+			unsigned int p = inc_len + self->rp;
+			if (self->len < p) {
+				self->rp = p - self->len;
+			} else {
+				self->rp = p;
+			}
 		}
 		if (self->wp == self->rp) {
 			self->rp = 0;
