@@ -61,6 +61,7 @@ hev_event_source_signal_check (HevEventSource *source, HevEventSourceFD *fd)
 		if (-1 == size) {
 			if (EAGAIN == errno)
 			  fd->revents &= ~EPOLLIN;
+			return false;
 		}
 		return true;
 	}
