@@ -15,6 +15,7 @@
 #include <hev-list.h>
 #include <hev-queue.h>
 #include <hev-async-queue.h>
+#include <hev-ring-buffer.h>
 #include <hev-event-loop.h>
 #include <hev-event-source.h>
 #include <hev-event-source-idle.h>
