@@ -182,18 +182,6 @@ set_fd_nonblock (int fd, bool nonblock)
 	return  true;
 }
 
-static size_t
-iovec_size (struct iovec *iovec, int len)
-{
-	int i = 0;
-	size_t size = 0;
-
-	for (i=0; i<len; i++)
-	  size += iovec[i].iov_len;
-
-	return size;
-}
-
 static bool
 client_source_handler (HevEventSourceFD *fd, void *data)
 {
@@ -211,7 +199,7 @@ client_source_handler (HevEventSourceFD *fd, void *data)
 	if (EPOLLIN & fd->revents) {
 		iovec_len = ring_buffer_writing (client->buffer, iovec);
 		/* get write buffer */
-		if (0 < iovec_size (iovec, iovec_len)) {
+		if (0 < iovec[0].iov_len) {
 			/* recv data */
 			mh.msg_iov = iovec;
 			mh.msg_iovlen = iovec_len;
@@ -235,7 +223,7 @@ client_source_handler (HevEventSourceFD *fd, void *data)
 	if ((EPOLLOUT & fd->revents) || trywrite ) {
 		/* try write */
 		iovec_len = ring_buffer_reading (client->buffer, iovec);
-		if (0 < iovec_size (iovec, iovec_len)) {
+		if (0 < iovec[0].iov_len) {
 			mh.msg_iov = iovec;
 			mh.msg_iovlen = iovec_len;
 			size = sendmsg (fd->fd, &mh, 0);
