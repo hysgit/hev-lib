@@ -109,6 +109,7 @@ hev_event_loop_run (HevEventLoop *self)
 					source->callback.callback, source->callback.data)) {
 					source->funcs.prepare (source);
 				} else {
+					fd->revents = 0;
 					invalid_sources = hev_slist_append (invalid_sources, source);
 				}
 			}
