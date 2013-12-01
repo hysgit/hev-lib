@@ -211,10 +211,10 @@ main (int argc, char *argv[])
 	loop = hev_event_loop_new ();
 
 	fd = socket (AF_INET, SOCK_STREAM, 0);
-	setsockopt (fd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr, sizeof (reuseaddr));
-	set_fd_nonblock (fd, true);
 	if (0 > fd)
 	  exit (1);
+	setsockopt (fd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr, sizeof (reuseaddr));
+	set_fd_nonblock (fd, true);
 	memset (&addr, 0, sizeof (addr));
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = inet_addr ("0.0.0.0");
@@ -239,13 +239,13 @@ main (int argc, char *argv[])
 	hev_event_source_unref (listener_source);
 
 	source = hev_event_source_timeout_new (30 * 1000);
-	hev_event_source_set_priority (listener_source, 1);
+	hev_event_source_set_priority (source, 1);
 	hev_event_source_set_callback (source, timeout_handler, NULL, NULL);
 	hev_event_loop_add_source (loop, source);
 	hev_event_source_unref (source);
 
 	source = hev_event_source_signal_new (SIGINT);
-	hev_event_source_set_priority (listener_source, 3);
+	hev_event_source_set_priority (source, 3);
 	hev_event_source_set_callback (source, signal_int_handler, loop, NULL);
 	hev_event_loop_add_source (loop, source);
 	hev_event_source_unref (source);
