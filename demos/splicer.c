@@ -76,16 +76,56 @@ set_fd_nonblock (int fd, bool nonblock)
 	return  true;
 }
 
+static ssize_t
+read_data (int fd, HevRingBuffer *buffer)
+{
+	struct msghdr mh;
+	struct iovec iovec[2];
+	size_t iovec_len = 0, inc_len = 0;
+	ssize_t size = -2;
+
+	iovec_len = hev_ring_buffer_writing (buffer, iovec);
+	if (0 < iovec_len) {
+		/* recv data */
+		memset (&mh, 0, sizeof (mh));
+		mh.msg_iov = iovec;
+		mh.msg_iovlen = iovec_len;
+		size = recvmsg (fd, &mh, 0);
+		inc_len = (0 > size) ? 0 : size;
+		hev_ring_buffer_write_finish (buffer, inc_len);
+	}
+
+	return size;
+}
+
+static ssize_t
+write_data (int fd, HevRingBuffer *buffer)
+{
+	struct msghdr mh;
+	struct iovec iovec[2];
+	size_t iovec_len = 0, inc_len = 0;
+	ssize_t size = -2;
+
+	iovec_len = hev_ring_buffer_reading (buffer, iovec);
+	if (0 < iovec_len) {
+		/* send data */
+		memset (&mh, 0, sizeof (mh));
+		mh.msg_iov = iovec;
+		mh.msg_iovlen = iovec_len;
+		size = sendmsg (fd, &mh, 0);
+		inc_len = (0 > size) ? 0 : size;
+		hev_ring_buffer_read_finish (buffer, inc_len);
+	}
+
+	return size;
+}
+
 static bool
 session_source_handler (HevEventSourceFD *fd, void *data)
 {
 	Session *session = NULL;
-	struct msghdr mh;
-	struct iovec iovec[2];
-	size_t iovec_len = 0, inc_len = 0;
 	ssize_t size = 0;
 
-	memset (&mh, 0, sizeof (mh));
 	session = hev_event_source_fd_get_data (fd);
 
 	if (EPOLLIN & fd->revents) {
@@ -99,15 +139,8 @@ session_source_handler (HevEventSourceFD *fd, void *data)
 			buffer = session->backward_buffer;
 		}
 		/* get write buffer */
-		iovec_len = hev_ring_buffer_writing (buffer, iovec);
-		if (0 < iovec_len) {
-			/* recv data */
-			mh.msg_iov = iovec;
-			mh.msg_iovlen = iovec_len;
-			size = recvmsg (fd->fd, &mh, 0);
-			inc_len = (0 > size) ? 0 : size;
-			hev_ring_buffer_write_finish (buffer, inc_len);
-
+		size = read_data (fd->fd, buffer);
+		if (-2 < size) {
 			if (-1 == size) {
 				if (EAGAIN == errno)
 				  fd->revents &= ~EPOLLIN;
@@ -118,14 +151,8 @@ session_source_handler (HevEventSourceFD *fd, void *data)
 			}
 		}
 		/* try write */
-		iovec_len = hev_ring_buffer_reading (buffer, iovec);
-		if (0 < iovec_len) {
-			mh.msg_iov = iovec;
-			mh.msg_iovlen = iovec_len;
-			size = sendmsg (pair->fd, &mh, 0);
-			inc_len = (0 > size) ? 0 : size;
-			hev_ring_buffer_read_finish (buffer, inc_len);
-
+		size = write_data (pair->fd, buffer);
+		if (-2 < size) {
 			if (-1 == size) {
 				if (EAGAIN != errno)
 				  goto remove_session;
@@ -140,14 +167,8 @@ session_source_handler (HevEventSourceFD *fd, void *data)
 		else
 		  buffer = session->forward_buffer;
 		/* try write */
-		iovec_len = hev_ring_buffer_reading (buffer, iovec);
-		if (0 < iovec_len) {
-			mh.msg_iov = iovec;
-			mh.msg_iovlen = iovec_len;
-			size = sendmsg (fd->fd, &mh, 0);
-			inc_len = (0 > size) ? 0 : size;
-			hev_ring_buffer_read_finish (buffer, inc_len);
-
+		size = write_data (fd->fd, buffer);
+		if (-2 < size) {
 			if (-1 == size) {
 				if (EAGAIN != errno)
 				  goto remove_session;
