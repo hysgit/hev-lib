@@ -116,8 +116,9 @@ client_source_handler (HevEventSourceFD *fd, void *data)
 				if (EAGAIN != errno)
 				  goto remove_client;
 			}
+		} else {
+			fd->revents &= ~EPOLLOUT;
 		}
-		fd->revents &= ~EPOLLOUT;
 	}
 
 	if ((EPOLLERR | EPOLLHUP) & fd->revents)
