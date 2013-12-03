@@ -104,7 +104,8 @@ hev_event_loop_run (HevEventLoop *self)
 			HevSList *invalid_sources = NULL;
 			HevEventSourceFD *fd = hev_slist_data (fd_list);
 			HevEventSource *source = fd->source;
-			if (source && source->funcs.check (source, fd)) {
+			if (source && (hev_event_source_get_loop (source) == self) &&
+						source->funcs.check (source, fd)) {
 				if (source->funcs.dispatch (source, fd,
 					source->callback.callback, source->callback.data)) {
 					source->funcs.prepare (source);
@@ -163,6 +164,7 @@ hev_event_loop_del_source (HevEventLoop *self, HevEventSource *source)
 {
 	if (self && source) {
 		HevSList *list = NULL;
+		_hev_event_source_set_loop (source, NULL);
 		self->sources = hev_slist_remove (self->sources, source);
 		for (list=source->fds; list; list=hev_slist_next (list)) {
 			HevEventSourceFD *fd = hev_slist_data (list);
