@@ -296,8 +296,9 @@ timeout_handler (void *data)
 			hev_event_loop_del_source (loop, session->source);
 			session_free (session);
 			hev_slist_set_data (list, NULL);
+		} else {
+			session->idle = true;
 		}
-		session->idle = true;
 	}
 	session_list = hev_slist_remove_all (session_list, NULL);
 	return true;
