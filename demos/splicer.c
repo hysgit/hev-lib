@@ -20,6 +20,14 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+enum
+{
+	CLIENT_IN = (1 << 3),
+	CLIENT_OUT = (1 << 2),
+	REMOTE_IN = (1 << 1),
+	REMOTE_OUT = (1 << 0),
+};
+
 static HevSList *session_list = NULL;
 
 typedef struct _Session Session;
@@ -31,6 +39,7 @@ struct _Session
 	HevEventSourceFD *remote_fd;
 	HevRingBuffer *forward_buffer;
 	HevRingBuffer *backward_buffer;
+	uint8_t revents;
 	bool idle;
 };
 
@@ -48,6 +57,7 @@ session_new (void)
 		session->remote_fd = NULL;
 		session->forward_buffer = NULL;
 		session->backward_buffer = NULL;
+		session->revents = 0;
 		session->idle = false;
 	}
 
@@ -133,58 +143,88 @@ session_source_handler (HevEventSourceFD *fd, void *data)
 	Session *session = data;
 	ssize_t size = 0;
 
-	if (EPOLLIN & fd->revents) {
-		HevEventSourceFD *pair = NULL;
-		HevRingBuffer *buffer = NULL;
-		if (fd == session->client_fd) {
-			pair = session->remote_fd;
-			buffer = session->forward_buffer;
-		} else {
-			pair = session->client_fd;
-			buffer = session->backward_buffer;
-		}
-		/* get write buffer */
-		size = read_data (fd->fd, buffer);
+	if ((EPOLLERR | EPOLLHUP) & fd->revents)
+	  goto remove_session;
+
+	if (fd == session->client_fd) {
+		if (EPOLLIN & fd->revents)
+		  session->revents |= CLIENT_IN;
+		if (EPOLLOUT & fd->revents)
+		  session->revents |= CLIENT_OUT;
+	} else {
+		if (EPOLLIN & fd->revents)
+		  session->revents |= REMOTE_IN;
+		if (EPOLLOUT & fd->revents)
+		  session->revents |= REMOTE_OUT;
+	}
+
+	if (CLIENT_OUT & session->revents) {
+		size = write_data (session->client_fd->fd, session->backward_buffer);
 		if (-2 < size) {
 			if (-1 == size) {
-				if (EAGAIN == errno)
-				  fd->revents &= ~EPOLLIN;
-				else
-				  goto remove_session;
+				if (EAGAIN == errno) {
+					session->revents &= ~CLIENT_OUT;
+					session->client_fd->revents &= ~EPOLLOUT;
+				} else {
+					goto remove_session;
+				}
+			}
+		} else {
+			session->client_fd->revents &= ~EPOLLOUT;
+		}
+	}
+
+	if (REMOTE_OUT & session->revents) {
+		size = write_data (session->remote_fd->fd, session->forward_buffer);
+		if (-2 < size) {
+			if (-1 == size) {
+				if (EAGAIN == errno) {
+					session->revents &= ~REMOTE_OUT;
+					session->remote_fd->revents &= ~EPOLLOUT;
+				} else {
+					goto remove_session;
+				}
+			}
+		} else {
+			session->remote_fd->revents &= ~EPOLLOUT;
+		}
+	}
+
+	if (CLIENT_IN & session->revents) {
+		size = read_data (session->client_fd->fd, session->forward_buffer);
+		if (-2 < size) {
+			if (-1 == size) {
+				if (EAGAIN == errno) {
+					session->revents &= ~CLIENT_IN;
+					session->client_fd->revents &= ~EPOLLIN;
+				} else {
+					goto remove_session;
+				}
 			} else if (0 == size) {
 				goto remove_session;
 			}
-		}
-		/* try write */
-		size = write_data (pair->fd, buffer);
-		if (-2 < size) {
-			if (-1 == size) {
-				if (EAGAIN != errno)
-				  goto remove_session;
-			}
+		} else {
+			session->client_fd->revents &= ~EPOLLIN;
 		}
 	}
 
-	if (EPOLLOUT & fd->revents) {
-		HevRingBuffer *buffer = NULL;
-		if (fd == session->client_fd)
-		  buffer = session->backward_buffer;
-		else
-		  buffer = session->forward_buffer;
-		/* try write */
-		size = write_data (fd->fd, buffer);
+	if (REMOTE_IN & session->revents) {
+		size = read_data (session->remote_fd->fd, session->backward_buffer);
 		if (-2 < size) {
 			if (-1 == size) {
-				if (EAGAIN != errno)
-				  goto remove_session;
+				if (EAGAIN == errno) {
+					session->revents &= ~REMOTE_IN;
+					session->remote_fd->revents &= ~EPOLLIN;
+				} else {
+					goto remove_session;
+				}
+			} else if (0 == size) {
+				goto remove_session;
 			}
 		} else {
-			fd->revents &= ~EPOLLOUT;
+			session->remote_fd->revents &= ~EPOLLIN;
 		}
 	}
-
-	if ((EPOLLERR | EPOLLHUP) & fd->revents)
-	  goto remove_session;
 
 	session->idle = false;
 
@@ -313,8 +353,8 @@ main (int argc, char *argv[])
 	hev_event_loop_add_source (loop, listener_source);
 	hev_event_source_unref (listener_source);
 
-	source = hev_event_source_timeout_new (30 * 1000);
-	hev_event_source_set_priority (source, 1);
+	source = hev_event_source_timeout_new (10 * 1000);
+	hev_event_source_set_priority (source, -1);
 	hev_event_source_set_callback (source, timeout_handler, loop, NULL);
 	hev_event_loop_add_source (loop, source);
 	hev_event_source_unref (source);
