@@ -202,8 +202,9 @@ timeout_handler (void *data)
 			printf ("Remove timeout client %d\n", client->fd->fd);
 			client_free (client);
 			hev_slist_set_data (list, NULL);
+		} else {
+			client->idle = true;
 		}
-		client->idle = true;
 	}
 	client_list = hev_slist_remove_all (client_list, NULL);
 	return true;
