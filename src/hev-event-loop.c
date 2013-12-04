@@ -155,7 +155,7 @@ hev_event_loop_add_source (HevEventLoop *self, HevEventSource *source)
 {
 	if (self && source) {
 		HevSList *list = NULL;
-		for (list=source->fds; list; list=hev_slist_next (list)) {
+		for (list=self->sources; list; list=hev_slist_next (list)) {
 			if (source == hev_slist_data (list))
 			  return false;
 		}
@@ -177,7 +177,7 @@ hev_event_loop_del_source (HevEventLoop *self, HevEventSource *source)
 {
 	if (self && source) {
 		HevSList *list = NULL;
-		for (list=source->fds; list; list=hev_slist_next (list)) {
+		for (list=self->sources; list; list=hev_slist_next (list)) {
 			if (source == hev_slist_data (list))
 			  break;
 		}
