@@ -54,8 +54,11 @@ hev_event_loop_unref (HevEventLoop *self)
 		self->ref_count --;
 		if (0 == self->ref_count) {
 			HevSList *list = NULL;
-			for (list=self->sources; list; list=hev_slist_next (list))
-			  hev_event_source_unref (hev_slist_data (list));
+			for (list=self->sources; list; list=hev_slist_next (list)) {
+				HevEventSource *source = hev_slist_data (list);
+				_hev_event_source_set_loop (source, NULL);
+				hev_event_source_unref (source);
+			}
 			hev_slist_free (self->sources);
 			close (self->epoll_fd);
 			HEV_MEMORY_ALLOCATOR_FREE (self);
