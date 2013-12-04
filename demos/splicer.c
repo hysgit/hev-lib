@@ -26,6 +26,7 @@ typedef struct _Session Session;
 
 struct _Session
 {
+	HevEventSource *source;
 	HevEventSourceFD *client_fd;
 	HevEventSourceFD *remote_fd;
 	HevRingBuffer *forward_buffer;
@@ -33,11 +34,16 @@ struct _Session
 	bool idle;
 };
 
+static bool session_source_handler (HevEventSourceFD *fd, void *data);
+
 static Session *
 session_new (void)
 {
 	Session *session = HEV_MEMORY_ALLOCATOR_ALLOC (sizeof (Session));
 	if (session) {
+		session->source = hev_event_source_fds_new ();
+		hev_event_source_set_callback (session->source,
+					(HevEventSourceFunc) session_source_handler, session, NULL);
 		session->client_fd = NULL;
 		session->remote_fd = NULL;
 		session->forward_buffer = NULL;
@@ -54,14 +60,15 @@ session_free (Session *session)
 	if (session) {
 		if (session->remote_fd) {
 			close (session->remote_fd->fd);
-			hev_event_source_del_fd (session->remote_fd->source, session->remote_fd->fd);
+			hev_event_source_del_fd (session->source, session->remote_fd->fd);
 		}
 		if (session->client_fd) {
 			close (session->client_fd->fd);
-			hev_event_source_del_fd (session->client_fd->source, session->client_fd->fd);
+			hev_event_source_del_fd (session->source, session->client_fd->fd);
 		}
 		hev_ring_buffer_unref (session->forward_buffer);
 		hev_ring_buffer_unref (session->backward_buffer);
+		hev_event_source_unref (session->source);
 		HEV_MEMORY_ALLOCATOR_FREE (session);
 	}
 }
@@ -123,10 +130,8 @@ write_data (int fd, HevRingBuffer *buffer)
 static bool
 session_source_handler (HevEventSourceFD *fd, void *data)
 {
-	Session *session = NULL;
+	Session *session = data;
 	ssize_t size = 0;
-
-	session = hev_event_source_fd_get_data (fd);
 
 	if (EPOLLIN & fd->revents) {
 		HevEventSourceFD *pair = NULL;
@@ -190,13 +195,13 @@ remove_session:
 	session_free (session);
 	session_list = hev_slist_remove (session_list, session);
 
-	return true;
+	return false;
 }
 
 static bool
 listener_source_handler (HevEventSourceFD *fd, void *data)
 {
-	HevEventSource *session_source = data;
+	HevEventLoop *loop = data;
 	struct sockaddr_in addr, raddr;
 	socklen_t addr_len;
 	int client_fd = -1, remote_fd = -1;
@@ -211,15 +216,14 @@ listener_source_handler (HevEventSourceFD *fd, void *data)
 		  printf ("Accept failed!\n");
 	} else {
 		Session *session = session_new ();
+		hev_event_loop_add_source (loop, session->source);
 		set_fd_nonblock (client_fd, true);
-		session->client_fd = hev_event_source_add_fd (session_source, client_fd,
+		session->client_fd = hev_event_source_add_fd (session->source, client_fd,
 					EPOLLIN | EPOLLOUT | EPOLLET);
-		hev_event_source_fd_set_data (session->client_fd, session);
 		remote_fd = socket (AF_INET, SOCK_STREAM, 0);
 		set_fd_nonblock (remote_fd, true);
-		session->remote_fd = hev_event_source_add_fd (session_source, remote_fd,
+		session->remote_fd = hev_event_source_add_fd (session->source, remote_fd,
 					EPOLLIN | EPOLLOUT | EPOLLET);
-		hev_event_source_fd_set_data (session->remote_fd, session);
 		memset (&raddr, 0, sizeof (raddr));
 		raddr.sin_family = AF_INET;
 		raddr.sin_addr.s_addr = inet_addr ("127.0.0.1");
@@ -243,11 +247,13 @@ listener_source_handler (HevEventSourceFD *fd, void *data)
 static bool
 timeout_handler (void *data)
 {
+	HevEventLoop *loop = data;
 	HevSList *list = NULL;
 	for (list=session_list; list; list=hev_slist_next (list)) {
 		Session *session = hev_slist_data (list);
 		if (session->idle) {
 			/* printf ("Remove timeout session %p\n", session); */
+			hev_event_loop_del_source (loop, session->source);
 			session_free (session);
 			hev_slist_set_data (list, NULL);
 		}
@@ -278,7 +284,7 @@ int
 main (int argc, char *argv[])
 {
 	HevEventLoop *loop = NULL;
-	HevEventSource *source = NULL, *listener_source = NULL, *session_source = NULL;
+	HevEventSource *source = NULL, *listener_source = NULL;
 	HevSList *list = NULL;
 	int fd = -1, reuseaddr = 1;
 	struct sockaddr_in addr;
@@ -299,23 +305,17 @@ main (int argc, char *argv[])
 	if (0 > listen (fd, 100))
 	  exit (3);
 
-	session_source = hev_event_source_fds_new ();
-	hev_event_source_set_callback (session_source,
-				(HevEventSourceFunc) session_source_handler, NULL, NULL);
-	hev_event_loop_add_source (loop, session_source);
-	hev_event_source_unref (session_source);
-
 	listener_source = hev_event_source_fds_new ();
 	hev_event_source_set_priority (listener_source, 2);
 	hev_event_source_add_fd (listener_source, fd, EPOLLIN | EPOLLET);
 	hev_event_source_set_callback (listener_source,
-				(HevEventSourceFunc) listener_source_handler, session_source, NULL);
+				(HevEventSourceFunc) listener_source_handler, loop, NULL);
 	hev_event_loop_add_source (loop, listener_source);
 	hev_event_source_unref (listener_source);
 
 	source = hev_event_source_timeout_new (30 * 1000);
 	hev_event_source_set_priority (source, 1);
-	hev_event_source_set_callback (source, timeout_handler, NULL, NULL);
+	hev_event_source_set_callback (source, timeout_handler, loop, NULL);
 	hev_event_loop_add_source (loop, source);
 	hev_event_source_unref (source);
 
