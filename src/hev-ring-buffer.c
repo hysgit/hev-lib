@@ -60,6 +60,16 @@ hev_ring_buffer_unref (HevRingBuffer *self)
 	}
 }
 
+void
+hev_ring_buffer_reset (HevRingBuffer *self)
+{
+	if (self) {
+		self->wp = 0;
+		self->rp = 0;
+		self->full = false;
+	}
+}
+
 size_t
 hev_ring_buffer_reading (HevRingBuffer *self, struct iovec *iovec)
 {

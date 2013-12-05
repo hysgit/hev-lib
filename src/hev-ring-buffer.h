@@ -21,6 +21,8 @@ HevRingBuffer * hev_ring_buffer_new (size_t len);
 HevRingBuffer * hev_ring_buffer_ref (HevRingBuffer *self);
 void hev_ring_buffer_unref (HevRingBuffer *self);
 
+void hev_ring_buffer_reset (HevRingBuffer *self);
+
 size_t hev_ring_buffer_reading (HevRingBuffer *self, struct iovec *iovec);
 void hev_ring_buffer_read_finish (HevRingBuffer *self, size_t inc_len);
 
