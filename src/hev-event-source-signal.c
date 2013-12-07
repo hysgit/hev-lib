@@ -11,7 +11,12 @@
 #include <unistd.h>
 #include <signal.h>
 #include <sys/epoll.h>
+#if defined(ANDROID)
+#include <fcntl.h>
+#include <asm/unistd.h>
+#else /* GENERIC */
 #include <sys/signalfd.h>
+#endif
 
 #include "hev-event-source-signal.h"
 
@@ -25,6 +30,31 @@ struct _HevEventSourceSignal
 	int signal_fd;
 };
 
+#if defined(ANDROID)
+#define SFD_NONBLOCK	O_NONBLOCK
+
+struct signalfd_siginfo
+{
+  uint32_t ssi_signo;
+  int32_t ssi_errno;
+  int32_t ssi_code;
+  uint32_t ssi_pid;
+  uint32_t ssi_uid;
+  int32_t ssi_fd;
+  uint32_t ssi_tid;
+  uint32_t ssi_band;
+  uint32_t ssi_overrun;
+  uint32_t ssi_trapno;
+  int32_t ssi_status;
+  int32_t ssi_int;
+  uint64_t ssi_ptr;
+  uint64_t ssi_utime;
+  uint64_t ssi_stime;
+  uint64_t ssi_addr;
+  uint8_t __pad[48];
+};
+#endif
+
 static HevEventSourceFuncs hev_event_source_signal_funcs =
 {
 	.prepare = NULL,
@@ -32,6 +62,14 @@ static HevEventSourceFuncs hev_event_source_signal_funcs =
 	.dispatch = NULL,
 	.finalize = hev_event_source_signal_finalize,
 };
+
+#if defined(ANDROID)
+static int
+signalfd (int fd, const sigset_t *mask, int flags)
+{
+	return syscall (__NR_signalfd4, fd, mask, _NSIG / 8, flags);
+}
+#endif
 
 HevEventSource *
 hev_event_source_signal_new (int signal)

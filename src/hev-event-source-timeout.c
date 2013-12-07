@@ -11,9 +11,19 @@
 #include <errno.h>
 #include <unistd.h>
 #include <sys/epoll.h>
+#if defined(ANDROID)
+#include <fcntl.h>
+#include <asm/unistd.h>
+#else /* GENERIC */
 #include <sys/timerfd.h>
+#endif
 
 #include "hev-event-source-timeout.h"
+
+#if defined(ANDROID)
+#define TFD_NONBLOCK	O_NONBLOCK
+#define TFD_TIMER_ABSTIME 1
+#endif
 
 static bool hev_event_source_timeout_prepare (HevEventSource *source);
 static bool hev_event_source_timeout_check (HevEventSource *source, HevEventSourceFD *fd);
@@ -34,6 +44,22 @@ static HevEventSourceFuncs hev_event_source_timeout_funcs =
 	.dispatch = NULL,
 	.finalize = hev_event_source_timeout_finalize,
 };
+
+#if defined(ANDROID)
+static int
+timerfd_create (int clockid, int flags)
+{
+	return syscall (__NR_timerfd_create, clockid, flags);
+}
+
+static int
+timerfd_settime (int fd, int flags,
+			const struct itimerspec *new_value,
+			struct itimerspec *old_value)
+{
+	return syscall (__NR_timerfd_settime, fd, flags, new_value, old_value);
+}
+#endif
 
 HevEventSource *
 hev_event_source_timeout_new (unsigned int interval)
