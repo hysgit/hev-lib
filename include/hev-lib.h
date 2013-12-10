@@ -14,6 +14,7 @@
 #include <hev-slist.h>
 #include <hev-list.h>
 #include <hev-queue.h>
+#include <hev-hash-table.h>
 #include <hev-async-queue.h>
 #include <hev-ring-buffer.h>
 #include <hev-event-loop.h>
