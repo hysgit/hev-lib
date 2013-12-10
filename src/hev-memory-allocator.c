@@ -7,6 +7,7 @@
  ============================================================================
  */
 
+#include <string.h>
 #include "hev-memory-allocator.h"
 
 HevMemoryAllocator *
@@ -63,5 +64,26 @@ void
 hev_memory_allocator_free (HevMemoryAllocator *self, void *ptr)
 {
 	free (ptr);
+}
+
+void *
+hev_malloc (size_t size)
+{
+	return HEV_MEMORY_ALLOCATOR_ALLOC (size);
+}
+
+void *
+hev_malloc0 (size_t size)
+{
+	void *data = HEV_MEMORY_ALLOCATOR_ALLOC (size);
+	if (data)
+	  memset (data, 0, size);
+	return data;
+}
+
+void
+hev_free (void *ptr)
+{
+	HEV_MEMORY_ALLOCATOR_FREE (ptr);
 }
 

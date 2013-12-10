@@ -37,5 +37,9 @@ void hev_memory_allocator_unref (HevMemoryAllocator *self);
 void * hev_memory_allocator_alloc (HevMemoryAllocator *self, size_t size);
 void hev_memory_allocator_free (HevMemoryAllocator *self, void *ptr);
 
+void * hev_malloc (size_t size);
+void * hev_malloc0 (size_t size);
+void hev_free (void *ptr);
+
 #endif /* __HEV_MEMORY_ALLOCATOR__ */
 
