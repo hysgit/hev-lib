@@ -29,6 +29,7 @@ LOCAL_SRC_FILES := \
 	src/hev-memory-allocator.c \
 	src/hev-queue.c \
 	src/hev-ring-buffer.c \
-	src/hev-slist.c
+	src/hev-slist.c \
+	src/hev-hash-table.c
 include $(BUILD_STATIC_LIBRARY)
 
