@@ -10,6 +10,10 @@
 #ifndef __HEV_LIB_H__
 #define __HEV_LIB_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <hev-memory-allocator.h>
 #include <hev-slist.h>
 #include <hev-list.h>
@@ -23,6 +27,10 @@
 #include <hev-event-source-timeout.h>
 #include <hev-event-source-signal.h>
 #include <hev-event-source-fds.h>
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __HEV_LIB_H__ */
 
