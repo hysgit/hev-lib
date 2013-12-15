@@ -74,17 +74,28 @@ signalfd (int fd, const sigset_t *mask, int flags)
 HevEventSource *
 hev_event_source_signal_new (int signal)
 {
-	HevEventSource *source = hev_event_source_new (&hev_event_source_signal_funcs,
+	int fd = -1;
+	HevEventSource *source = NULL;
+	HevEventSourceSignal *self = NULL;
+	sigset_t mask;
+
+	fd = signalfd (-1, &mask, SFD_NONBLOCK);
+	if (-1 == fd)
+	  return NULL;
+
+	source = hev_event_source_new (&hev_event_source_signal_funcs,
 				sizeof (HevEventSourceSignal));
-	if (source) {
-		HevEventSourceSignal *self = (HevEventSourceSignal *) source;
-		sigset_t mask;
-		sigemptyset (&mask);
-		sigaddset (&mask, signal);
-		sigprocmask(SIG_BLOCK, &mask, NULL);
-		self->signal_fd = signalfd (-1, &mask, SFD_NONBLOCK);
-		hev_event_source_add_fd (source, self->signal_fd, EPOLLIN | EPOLLET);
+	if (NULL == source) {
+		close (fd);
+		return NULL;
 	}
+
+	self = (HevEventSourceSignal *) source;
+	sigemptyset (&mask);
+	sigaddset (&mask, signal);
+	sigprocmask(SIG_BLOCK, &mask, NULL);
+	self->signal_fd = fd;
+	hev_event_source_add_fd (source, self->signal_fd, EPOLLIN | EPOLLET);
 
 	return source;
 }
