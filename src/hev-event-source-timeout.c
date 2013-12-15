@@ -64,14 +64,25 @@ timerfd_settime (int fd, int flags,
 HevEventSource *
 hev_event_source_timeout_new (unsigned int interval)
 {
-	HevEventSource *source = hev_event_source_new (&hev_event_source_timeout_funcs,
+	int fd = -1;
+	HevEventSource *source = NULL;
+	HevEventSourceTimeout *self = NULL;
+
+	fd = timerfd_create (CLOCK_MONOTONIC, TFD_NONBLOCK);
+	if (-1 == fd)
+	  return NULL;
+
+	source = hev_event_source_new (&hev_event_source_timeout_funcs,
 				sizeof (HevEventSourceTimeout));
-	if (source) {
-		HevEventSourceTimeout *self = (HevEventSourceTimeout *) source;
-		self->timer_fd = timerfd_create (CLOCK_MONOTONIC, TFD_NONBLOCK);
-		self->interval = interval;
-		hev_event_source_add_fd (source, self->timer_fd, EPOLLIN | EPOLLET);
+	if (NULL == source) {
+		close (fd);
+		return NULL;
 	}
+
+	self = (HevEventSourceTimeout *) source;
+	self->timer_fd = fd;
+	self->interval = interval;
+	hev_event_source_add_fd (source, self->timer_fd, EPOLLIN | EPOLLET);
 
 	return source;
 }
