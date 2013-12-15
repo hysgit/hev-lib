@@ -35,14 +35,25 @@ static HevEventSourceFuncs hev_event_source_idle_funcs =
 HevEventSource *
 hev_event_source_idle_new (void)
 {
-	HevEventSource *source = hev_event_source_new (&hev_event_source_idle_funcs,
+	int fd = -1;
+	HevEventSource *source = NULL;
+	HevEventSourceIdle *self = NULL;
+
+	fd = eventfd (0, EFD_NONBLOCK);
+	if (-1 == fd)
+	  return NULL;
+
+	source = hev_event_source_new (&hev_event_source_idle_funcs,
 				sizeof (HevEventSourceIdle));
-	if (source) {
-		HevEventSourceIdle *self = (HevEventSourceIdle *) source;
-		self->event_fd = eventfd (0, EFD_NONBLOCK);
-		hev_event_source_set_priority (source, INT32_MIN);
-		hev_event_source_add_fd (source, self->event_fd, EPOLLIN | EPOLLET);
+	if (NULL == source) {
+		close (fd);
+		return NULL;
 	}
+
+	self = (HevEventSourceIdle *) source;
+	self->event_fd = fd;
+	hev_event_source_set_priority (source, INT32_MIN);
+	hev_event_source_add_fd (source, self->event_fd, EPOLLIN | EPOLLET);
 
 	return source;
 }
