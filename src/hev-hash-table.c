@@ -25,7 +25,7 @@ struct _HevHashTable
 {
 	int size;
 	int mod;
-	int mask;
+	unsigned int mask;
 	int nnodes;
 	int noccupied;
 	unsigned int ref_count;
@@ -543,9 +543,9 @@ hev_hash_table_new_full (HevHTHashFunc hash_func, HevHTEqualFunc key_equal_func,
 		self->key_equal_func = key_equal_func;
 		self->key_destroy_notify = key_destroy_notify;
 		self->value_destroy_notify = value_destroy_notify;
-		self->keys = HEV_MEMORY_ALLOCATOR_ALLOC (sizeof (void *) * self->size);
+		self->keys = new0 (sizeof (void *), self->size);
 		self->values = self->keys;
-		self->hashes = HEV_MEMORY_ALLOCATOR_ALLOC (sizeof (unsigned int) * self->size);
+		self->hashes = new0 (sizeof (unsigned int), self->size);
 	}
 
 	return self;
