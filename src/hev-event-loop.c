@@ -122,11 +122,10 @@ hev_event_loop_run (HevEventLoop *self)
 					}
 				}
 			}
-			fd_list = hev_slist_remove (fd_list, fd);
-			if (!(fd->_events & fd->revents) || !fd->source)
-			  _hev_event_source_fd_unref (fd);
-			else
-			  fd_list = insert_event_source_fd_sorted (fd_list, fd);
+			if (!(fd->_events & fd->revents) || !fd->source) {
+				fd_list = hev_slist_remove (fd_list, fd);
+				_hev_event_source_fd_unref (fd);
+			}
 			/* delete invalid sources */
 			if (invalid_sources) {
 				HevSList *list = NULL;
