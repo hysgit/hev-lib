@@ -403,8 +403,6 @@ hev_ring_buffer_write_finish (HevRingBuffer *self, size_t inc_len)
 			if ((self->rp == self->wp) && !self->full) {
 				assert (self->len >= inc_len);
 				self->wp = inc_len;
-				if (inc_len == self->len)
-				  self->full = true;
 				return;
 			}
 			/* rp
@@ -413,8 +411,6 @@ hev_ring_buffer_write_finish (HevRingBuffer *self, size_t inc_len)
 			if ((0 < self->wp) && (self->len > self->wp)) {
 				assert ((self->len - self->wp) >= inc_len);
 				self->wp += inc_len;
-				if (self->wp == self->len)
-				  self->full = true;
 				return;
 			}
 			/* rp
