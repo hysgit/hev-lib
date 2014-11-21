@@ -20,5 +20,8 @@ void hev_queue_unref (HevQueue *self);
 void hev_queue_push (HevQueue *self, void *data);
 void * hev_queue_pop (HevQueue *self);
 
+void * hev_queue_peek_head (HevQueue *self);
+void * hev_queue_peek_tail (HevQueue *self);
+
 #endif /* __HEV_QUEUE_H__ */
 

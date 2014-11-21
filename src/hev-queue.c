@@ -77,3 +77,24 @@ hev_queue_pop (HevQueue *self)
 	return NULL;
 }
 
+void *
+hev_queue_peek_head (HevQueue *self)
+{
+	if (self && self->slist)
+	  return hev_slist_data (self->slist);
+
+	return NULL;
+}
+
+void *
+hev_queue_peek_tail (HevQueue *self)
+{
+	if (self && self->slist) {
+		HevSList *slist = NULL;
+		slist = hev_slist_last (self->slist);
+		return hev_slist_data (slist);
+	}
+
+	return NULL;
+}
+
