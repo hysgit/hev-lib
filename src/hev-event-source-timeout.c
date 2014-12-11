@@ -91,16 +91,13 @@ static bool
 hev_event_source_timeout_prepare (HevEventSource *source)
 {
 	HevEventSourceTimeout *self = (HevEventSourceTimeout *) source;
-	uint64_t time = 0;
 	struct itimerspec spec;
+
 	spec.it_interval.tv_sec = 0;
 	spec.it_interval.tv_nsec = 0;
-	clock_gettime (CLOCK_MONOTONIC, &spec.it_value);
-	time = ((uint64_t) spec.it_value.tv_sec) * 1000000000 + spec.it_value.tv_nsec;
-	time += ((uint64_t) self->interval) * 1000000;
-	spec.it_value.tv_sec = time / 1000000000;
-	spec.it_value.tv_nsec = time % 1000000000;
-	timerfd_settime (self->timer_fd, TFD_TIMER_ABSTIME, &spec, NULL);
+	spec.it_value.tv_sec = self->interval / 1000;
+	spec.it_value.tv_nsec = (self->interval % 1000) * 1000 * 1000;
+	timerfd_settime (self->timer_fd, 0, &spec, NULL);
 
 	return true;
 }
