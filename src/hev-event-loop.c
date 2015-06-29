@@ -7,6 +7,7 @@
  ============================================================================
  */
 
+#include <stdio.h>
 #include <stddef.h>
 #include <unistd.h>
 #include <sys/epoll.h>
@@ -95,6 +96,10 @@ hev_event_loop_run (HevEventLoop *self)
 
 		/* waiting events */
 		nfds = epoll_wait (self->epoll_fd, events, 256, timeout);
+		if (-1 == nfds) {
+			fprintf (stderr, "EPoll wait failed!\n");
+			break;
+		}
 		/* insert to fd_list, sorted by source priority (highest ... lowest) */
 		for (i=0; i<nfds; i++) {
 			HevEventSourceFD *fd = events[i].data.ptr;
