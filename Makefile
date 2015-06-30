@@ -1,4 +1,6 @@
 # Makefile for hev-lib
+
+PROJECT=hev-lib
  
 PP=cpp
 CC=cc
@@ -17,35 +19,35 @@ SHARED_TARGET=$(BINDIR)/libhev-lib.so
 $(SHARED_TARGET) : CCFLAGS+=-fPIC
 $(SHARED_TARGET) : LDFLAGS+=-shared -pthread
 
-CCOBJSFILE=$(BUILDDIR)/ccobjs
--include $(CCOBJSFILE)
+CCOBJS=$(wildcard $(SRCDIR)/*.c)
 LDOBJS=$(patsubst $(SRCDIR)%.c,$(BUILDDIR)%.o,$(CCOBJS))
- 
 DEPEND=$(LDOBJS:.o=.dep)
+
+BUILDMSG="\e[1;31mBUILD\e[0m $<"
+LINKMSG="\e[1;34mLINK\e[0m  \e[1;32m$@\e[0m"
+CLEANMSG="\e[1;34mCLEAN\e[0m $(PROJECT)"
  
-shared : $(CCOBJSFILE) $(SHARED_TARGET)
-	@$(RM) $(CCOBJSFILE)
+shared : $(SHARED_TARGET)
  
-static : $(CCOBJSFILE) $(STATIC_TARGET)
-	@$(RM) $(CCOBJSFILE)
+static : $(STATIC_TARGET)
  
 clean : 
-	@echo -n "Clean ... " && $(RM) $(BINDIR)/* $(BUILDDIR)/* && echo "OK"
- 
-$(CCOBJSFILE) : 
-	@echo CCOBJS=`ls $(SRCDIR)/*.c` > $(CCOBJSFILE)
+	@$(RM) $(BINDIR)/* $(BUILDDIR)/*
+	@echo -e $(CLEANMSG)
  
 $(STATIC_TARGET) : $(LDOBJS)
-	@echo -n "Linking $^ to $@ ... " && $(AR) csq $@ $^ && echo "OK"
+	@$(AR) csq $@ $^
+	@echo -e $(LINKMSG)
  
 $(SHARED_TARGET) : $(LDOBJS)
-	@echo -n "Linking $^ to $@ ... " && $(CC) -o $@ $^ $(LDFLAGS) && echo "OK"
+	@$(CC) -o $@ $^ $(LDFLAGS)
+	@echo -e $(LINKMSG)
  
 $(BUILDDIR)/%.dep : $(SRCDIR)/%.c
 	@$(PP) $(CCFLAGS) -MM -MT $(@:.dep=.o) -o $@ $<
  
 $(BUILDDIR)/%.o : $(SRCDIR)/%.c
-	@echo -n "Building $< ... " && $(CC) $(CCFLAGS) -c -o $@ $< && echo "OK"
+	@$(CC) $(CCFLAGS) -c -o $@ $<
+	@echo -e $(BUILDMSG)
  
 -include $(DEPEND)
-
