@@ -7,6 +7,7 @@
  ============================================================================
  */
 
+#include <errno.h>
 #include <stdio.h>
 #include <stddef.h>
 #include <unistd.h>
@@ -96,7 +97,7 @@ hev_event_loop_run (HevEventLoop *self)
 
 		/* waiting events */
 		nfds = epoll_wait (self->epoll_fd, events, 256, timeout);
-		if (-1 == nfds) {
+		if (-1 == nfds && EINTR != errno) {
 			fprintf (stderr, "EPoll wait failed!\n");
 			break;
 		}
