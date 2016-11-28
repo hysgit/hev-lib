@@ -28,6 +28,7 @@ struct _HevMemoryAllocator
 };
 
 HevMemoryAllocator * hev_memory_allocator_default (void);
+HevMemoryAllocator * hev_memory_allocator_set_default (HevMemoryAllocator *allocator);
 
 HevMemoryAllocator * hev_memory_allocator_new (void);
 

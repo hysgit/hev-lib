@@ -10,15 +10,26 @@
 #include <string.h>
 #include "hev-memory-allocator.h"
 
+static HevMemoryAllocator *default_allocator;
+
 HevMemoryAllocator *
 hev_memory_allocator_default (void)
 {
-	static HevMemoryAllocator *allocator = NULL;
+	if (!default_allocator)
+	  default_allocator = hev_memory_allocator_new ();
 
-	if (!allocator)
-	  allocator = hev_memory_allocator_new ();
+	return default_allocator;
+}
 
-	return allocator;
+HevMemoryAllocator *
+hev_memory_allocator_set_default (HevMemoryAllocator *allocator)
+{
+	HevMemoryAllocator *old_allocator;
+
+	old_allocator = default_allocator;
+	default_allocator = allocator;
+
+	return old_allocator;
 }
 
 HevMemoryAllocator *
