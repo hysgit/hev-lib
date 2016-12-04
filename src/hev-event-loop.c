@@ -36,6 +36,7 @@ hev_event_loop_new (void)
 		self->ref_count = 1;
 		self->run = true;
 		self->sources = NULL;
+		self->fd_list = NULL;
 	}
 
 	return self;
