@@ -31,5 +31,8 @@ LOCAL_SRC_FILES := \
 	src/hev-ring-buffer.c \
 	src/hev-slist.c \
 	src/hev-hash-table.c
+ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)
+LOCAL_CFLAGS += -mfpu=neon
+endif
 include $(BUILD_STATIC_LIBRARY)
 
