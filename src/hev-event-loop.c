@@ -113,7 +113,7 @@ dispatch_events (HevEventLoop *self)
 
 	if (!(fd->_events & fd->revents) || !fd->source) {
 		self->fd_list = hev_slist_remove (self->fd_list, fd);
-		_hev_event_source_fd_unref (fd);
+		_hev_event_source_fd_dispatch_finish (fd);
 	}
 
 	/* delete invalid sources */
@@ -147,7 +147,9 @@ hev_event_loop_run (HevEventLoop *self)
 		for (i=0; i<nfds; i++) {
 			HevEventSourceFD *fd = events[i].data.ptr;
 			fd->revents |= events[i].events;
-			fd = _hev_event_source_fd_ref (fd);
+			if (fd->_dispatched)
+			  continue;
+			_hev_event_source_fd_dispatch (fd);
 			self->fd_list = insert_event_source_fd_sorted (self->fd_list, fd);
 		}
 
