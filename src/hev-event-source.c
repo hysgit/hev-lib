@@ -60,23 +60,25 @@ hev_event_source_ref (HevEventSource *self)
 	return NULL;
 }
 
+static void
+fds_free_handler (void *data)
+{
+	_hev_event_source_fd_clear_source (data);
+	_hev_event_source_fd_unref (data);
+}
+
 void
 hev_event_source_unref (HevEventSource *self)
 {
 	if (self) {
 		self->ref_count --;
 		if (0 == self->ref_count) {
-			HevSList *list = NULL;
 			self->funcs.finalize (self);
 			if (self->name)
 			  HEV_MEMORY_ALLOCATOR_FREE (self->name);
 			if (self->callback.notify)
 			  self->callback.notify (self->callback.data);
-			for (list=self->fds; list; list=hev_slist_next (list)) {
-				_hev_event_source_fd_clear_source (hev_slist_data (list));
-				_hev_event_source_fd_unref (hev_slist_data (list));
-			}
-			hev_slist_free (self->fds);
+			hev_slist_free_notify (self->fds, fds_free_handler);
 			HEV_MEMORY_ALLOCATOR_FREE (self);
 		}
 	}
