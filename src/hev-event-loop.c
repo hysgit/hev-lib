@@ -80,15 +80,15 @@ hev_event_loop_unref (HevEventLoop *self)
 static HevSList *
 insert_event_source_fd_sorted (HevSList *fd_list, HevEventSourceFD *fd)
 {
-	HevSList *list = NULL;
+	HevSList *list = NULL, *prev = NULL;
 
-	for (list=fd_list; list; list=hev_slist_next (list)) {
+	for (list=fd_list; list; prev=list,list=hev_slist_next (list)) {
 		HevEventSourceFD *_fd  = hev_slist_data (list);
 		if (hev_event_source_get_priority (fd->source) >
 				hev_event_source_get_priority (_fd->source))
 		  break;
 	}
-	return hev_slist_insert_before (fd_list, fd, list);
+	return hev_slist_insert_after (fd_list, fd, prev);
 }
 
 static void
