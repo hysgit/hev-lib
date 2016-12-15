@@ -52,11 +52,16 @@ hev_event_loop_ref (HevEventLoop *self)
 void
 hev_event_loop_unref (HevEventLoop *self)
 {
+	HevSList *list = NULL;
+
 	self->ref_count --;
 	if (0 < self->ref_count)
 	  return;
 
-	HevSList *list = NULL;
+	for (list=self->fd_list; list; list=hev_slist_next (list)) {
+		HevEventSourceFD *fd = hev_slist_data (list);
+		_hev_event_source_fd_dispatch_finish (fd);
+	}
 	for (list=self->sources; list; list=hev_slist_next (list)) {
 		HevEventSource *source = hev_slist_data (list);
 		_hev_event_source_set_loop (source, NULL);
