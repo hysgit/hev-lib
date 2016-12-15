@@ -49,26 +49,30 @@ hev_event_loop_ref (HevEventLoop *self)
 	return self;
 }
 
+static void
+fd_list_free_handler (void *data)
+{
+	HevEventSourceFD *fd = data;
+	_hev_event_source_fd_dispatch_finish (fd);
+}
+
+static void
+sources_free_handler (void *data)
+{
+	HevEventSource *source = data;
+	_hev_event_source_set_loop (source, NULL);
+	hev_event_source_unref (source);
+}
+
 void
 hev_event_loop_unref (HevEventLoop *self)
 {
-	HevSList *list = NULL;
-
 	self->ref_count --;
 	if (0 < self->ref_count)
 	  return;
 
-	for (list=self->fd_list; list; list=hev_slist_next (list)) {
-		HevEventSourceFD *fd = hev_slist_data (list);
-		_hev_event_source_fd_dispatch_finish (fd);
-	}
-	for (list=self->sources; list; list=hev_slist_next (list)) {
-		HevEventSource *source = hev_slist_data (list);
-		_hev_event_source_set_loop (source, NULL);
-		hev_event_source_unref (source);
-	}
-	hev_slist_free (self->fd_list);
-	hev_slist_free (self->sources);
+	hev_slist_free_notify (self->fd_list, fd_list_free_handler);
+	hev_slist_free_notify (self->sources, sources_free_handler);
 	close (self->epoll_fd);
 	HEV_MEMORY_ALLOCATOR_FREE (self);
 }
@@ -85,6 +89,13 @@ insert_event_source_fd_sorted (HevSList *fd_list, HevEventSourceFD *fd)
 		  break;
 	}
 	return hev_slist_insert_before (fd_list, fd, list);
+}
+
+static void
+invalid_sources_free_handler (void *data)
+{
+	HevEventSource *source = data;
+	hev_event_loop_del_source (source->loop, source);
 }
 
 static inline int
@@ -122,12 +133,8 @@ dispatch_events (HevEventLoop *self)
 	}
 
 	/* delete invalid sources */
-	if (invalid_sources) {
-		HevSList *list = NULL;
-		for (list=invalid_sources; list; list=hev_slist_next (list))
-		  hev_event_loop_del_source (self, hev_slist_data (list));
-		hev_slist_free (invalid_sources);
-	}
+	if (invalid_sources)
+	  hev_slist_free_notify (invalid_sources, invalid_sources_free_handler);
 
 	return 0;
 }
