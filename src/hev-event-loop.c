@@ -106,7 +106,7 @@ dispatch_events (HevEventLoop *self)
 				  source->funcs.prepare (source);
 			} else {
 				fd->revents = 0;
-				invalid_sources = hev_slist_append (invalid_sources, source);
+				invalid_sources = hev_slist_prepend (invalid_sources, source);
 			}
 		}
 	}
@@ -174,7 +174,7 @@ hev_event_loop_add_source (HevEventLoop *self, HevEventSource *source)
 		  return false;
 	}
 	_hev_event_source_set_loop (source, self);
-	self->sources = hev_slist_append (self->sources, hev_event_source_ref (source));
+	self->sources = hev_slist_prepend (self->sources, hev_event_source_ref (source));
 	for (list=source->fds; list; list=hev_slist_next (list)) {
 		HevEventSourceFD *fd = hev_slist_data (list);
 		_hev_event_loop_add_fd (self, fd);
