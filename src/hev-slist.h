@@ -21,6 +21,7 @@ HevSList * hev_slist_insert_before (HevSList *self, void *data, HevSList *siblin
 HevSList * hev_slist_insert_after (HevSList *self, void *data, HevSList *sibling);
 HevSList * hev_slist_remove (HevSList *self, const void *data);
 HevSList * hev_slist_remove_all (HevSList *self, const void *data);
+HevSList * hev_slist_remove_next (HevSList *self, HevSList *sibling);
 
 HevSList * hev_slist_last (HevSList *self);
 HevSList * hev_slist_next (HevSList *self);

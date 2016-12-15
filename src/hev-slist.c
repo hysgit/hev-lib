@@ -191,6 +191,25 @@ hev_slist_remove_all (HevSList *self, const void *data)
 }
 
 HevSList *
+hev_slist_remove_next (HevSList *self, HevSList *sibling)
+{
+	if (self) {
+		if (!sibling) {
+			HEV_MEMORY_ALLOCATOR_FREE (self);
+			return self->next;
+		}
+		if (sibling->next) {
+			HevSList *next = sibling->next;
+			sibling->next = next->next;
+			HEV_MEMORY_ALLOCATOR_FREE (next);
+		}
+		return self;
+	}
+
+	return NULL;
+}
+
+HevSList *
 hev_slist_last (HevSList *self)
 {
 	if (self) {
