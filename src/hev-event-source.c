@@ -135,7 +135,7 @@ hev_event_source_add_fd (HevEventSource *self, int fd, uint32_t events)
 		}
 		HevEventSourceFD *efd = _hev_event_source_fd_new (self, fd, events);
 		if (efd) {
-			self->fds = hev_slist_append (self->fds, efd);
+			self->fds = hev_slist_prepend (self->fds, efd);
 			if (self->loop && !_hev_event_loop_add_fd (self->loop, efd)) {
 				_hev_event_source_fd_unref (efd);
 				efd = NULL;
