@@ -213,3 +213,18 @@ hev_slist_free (HevSList *self)
 	}
 }
 
+void
+hev_slist_free_notify (HevSList *self, HevDestroyNotify notify)
+{
+	if (self) {
+		HevSList *node = NULL;
+		for (node=self; node;) {
+			HevSList *curr = node;
+			node = node->next;
+			if (notify)
+			  notify (curr->data);
+			HEV_MEMORY_ALLOCATOR_FREE (curr);
+		}
+	}
+}
+
