@@ -153,9 +153,9 @@ bool
 hev_event_source_del_fd (HevEventSource *self, int fd)
 {
 	if (self) {
-		HevSList *list = NULL;
 		HevEventSourceFD *rfd = NULL;
-		for (list=self->fds; list; list=hev_slist_next (list)) {
+		HevSList *list = NULL, *prev = NULL;
+		for (list=self->fds; list; prev=list,list=hev_slist_next (list)) {
 			HevEventSourceFD *efd = hev_slist_data (list);
 			if (efd->fd == fd) {
 				rfd = efd;
@@ -164,7 +164,7 @@ hev_event_source_del_fd (HevEventSource *self, int fd)
 		}
 		if (rfd) {
 			bool res = false;
-			self->fds = hev_slist_remove (self->fds, rfd);
+			self->fds = hev_slist_remove_next (self->fds, prev);
 			if (self->loop)
 			  res = _hev_event_loop_del_fd (self->loop, rfd);
 			_hev_event_source_fd_clear_source (rfd);
