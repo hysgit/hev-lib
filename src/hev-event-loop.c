@@ -181,10 +181,9 @@ hev_event_loop_add_source (HevEventLoop *self, HevEventSource *source)
 {
 	HevSList *list = NULL;
 
-	for (list=self->sources; list; list=hev_slist_next (list)) {
-		if (source == hev_slist_data (list))
-		  return false;
-	}
+	if (source->loop == self)
+	  return false;
+
 	_hev_event_source_set_loop (source, self);
 	self->sources = hev_slist_prepend (self->sources, hev_event_source_ref (source));
 	for (list=source->fds; list; list=hev_slist_next (list)) {
@@ -201,22 +200,18 @@ hev_event_loop_del_source (HevEventLoop *self, HevEventSource *source)
 {
 	HevSList *list = NULL;
 
-	for (list=self->sources; list; list=hev_slist_next (list)) {
-		if (source == hev_slist_data (list))
-		  break;
-	}
-	if (list) {
-		_hev_event_source_set_loop (source, NULL);
-		self->sources = hev_slist_remove (self->sources, source);
-		for (list=source->fds; list; list=hev_slist_next (list)) {
-			HevEventSourceFD *fd = hev_slist_data (list);
-			_hev_event_loop_del_fd (self, fd);
-		}
-		hev_event_source_unref (source);
-		return true;
-	}
+	if (source->loop != self)
+	  return false;
 
-	return false;
+	_hev_event_source_set_loop (source, NULL);
+	self->sources = hev_slist_remove (self->sources, source);
+	for (list=source->fds; list; list=hev_slist_next (list)) {
+		HevEventSourceFD *fd = hev_slist_data (list);
+		_hev_event_loop_del_fd (self, fd);
+	}
+	hev_event_source_unref (source);
+
+	return true;
 }
 
 bool
