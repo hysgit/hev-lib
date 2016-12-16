@@ -15,6 +15,7 @@ extern "C" {
 #endif
 
 #include <hev-memory-allocator.h>
+#include <hev-memory-allocator-slice.h>
 #include <hev-slist.h>
 #include <hev-list.h>
 #include <hev-queue.h>
