@@ -85,7 +85,7 @@ hev_slist_insert (HevSList *self, void *data, unsigned int position)
 		}
 	}
 
-	return NULL;
+	return self;
 }
 
 HevSList *
