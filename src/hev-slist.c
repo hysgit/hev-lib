@@ -127,22 +127,16 @@ hev_slist_insert_after (HevSList *self, void *data, HevSList *sibling)
 	HevSList *new = HEV_MEMORY_ALLOCATOR_ALLOC (sizeof (HevSList));
 	if (new) {
 		new->data = data;
-		if (self) {
-			if (sibling) {
-				new->next = sibling->next;
-				sibling->next = new;
-			} else {
-				new->next = NULL;
-				self->next = new;
-			}
+		if (sibling) {
+			new->next = sibling->next;
+			sibling->next = new;
 			return self;
-		} else {
-			new->next = NULL;
-			return new;
 		}
+		new->next = self;
+		return new;
 	}
 
-	return NULL;
+	return self;
 }
 
 HevSList *
