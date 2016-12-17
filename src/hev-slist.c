@@ -34,7 +34,7 @@ hev_slist_append (HevSList *self, void *data)
 		}
 	}
 
-	return NULL;
+	return self;
 }
 
 HevSList *
