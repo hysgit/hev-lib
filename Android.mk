@@ -27,6 +27,7 @@ LOCAL_SRC_FILES := \
 	src/hev-event-source.c \
 	src/hev-list.c \
 	src/hev-memory-allocator.c \
+	src/hev-memory-allocator-slice.c \
 	src/hev-queue.c \
 	src/hev-ring-buffer.c \
 	src/hev-slist.c \
