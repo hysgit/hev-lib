@@ -51,7 +51,7 @@ hev_slist_prepend (HevSList *self, void *data)
 		return new;
 	}
 
-	return NULL;
+	return self;
 }
 
 HevSList *
