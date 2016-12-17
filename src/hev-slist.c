@@ -118,7 +118,7 @@ hev_slist_insert_before (HevSList *self, void *data, HevSList *sibling)
 		}
 	}
 
-	return NULL;
+	return self;
 }
 
 HevSList *
