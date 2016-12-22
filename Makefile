@@ -26,10 +26,10 @@ DEPEND=$(LDOBJS:.o=.dep)
 BUILDMSG="\e[1;31mBUILD\e[0m $<"
 LINKMSG="\e[1;34mLINK\e[0m  \e[1;32m$@\e[0m"
 CLEANMSG="\e[1;34mCLEAN\e[0m $(PROJECT)"
+
+static : $(STATIC_TARGET)
  
 shared : $(SHARED_TARGET)
- 
-static : $(STATIC_TARGET)
  
 clean : 
 	@$(RM) $(BINDIR)/* $(BUILDDIR)/*
